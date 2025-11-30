@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Armurerie – Interface simple macOS</title>
+<style>
+    body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        background: url('https://i.goopics.net/relgy4.jpg');
+        background-size: cover;
+        background-position: center;
+        height: 100vh;
+        overflow: hidden;
+    }
+
+    /* Fenêtres */
+    .window {
+        width: 420px;
+        height: 300px;
+        background: rgba(255,255,255,0.25);
+        backdrop-filter: blur(14px);
+        border-radius: 12px;
+        border: 1px solid rgba(255,255,255,0.35);
+        position: absolute;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        overflow: hidden;
+        resize: both;          /* <--- Redimensionnable */
+        min-width: 300px;
+        min-height: 200px;
+    }
+
+    /* Barre de titre style macOS */
+    .titlebar {
+        height: 30px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding-left: 12px;
+        border-bottom: 1px solid rgba(255,255,255,0.2);
+        cursor: grab;
+        background: rgba(255,255,255,0.15);
+    }
+
+    .dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+    }
+    .red { background: #ff5f57; }
+    .orange { background: #ffbd2e; }
+    .green { background: #28c840; }
+
+    .content {
+        padding: 12px;
+        font-size: 14px;
+        height: calc(100% - 30px);
+        overflow-y: auto;
+    }
+
+    .item {
+        background: rgba(255,255,255,0.25);
+        border: 1px solid rgba(255,255,255,0.25);
+        padding: 10px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+    }
+
+    .serials {
+        font-family: monospace;
+        white-space: pre-wrap;
+        background: rgba(0,0,0,0.25);
+        padding: 6px;
+        border-radius: 6px;
+        margin-top: 6px;
+        font-size: 12px;
+    }
+</style>
+</head>
+<body>
+
+<!-- Fenêtre STOCKS -->
+<div class="window" id="winStocks" style="left: 40px; top: 40px;">
+    <div class="titlebar">
+        <div class="dot red"></div>
+        <div class="dot orange"></div>
+        <div class="dot green"></div>
+        <strong style="margin-left:8px;">Stocks</strong>
+    </div>
+    <div class="content" id="stocksContent"></div>
+</div>
+
+<!-- Fenêtre RECENSEMENT -->
+<div class="window" id="winRecensement" style="left: 520px; top: 140px;">
+    <div class="titlebar">
+        <div class="dot red"></div>
+        <div class="dot orange"></div>
+        <div class="dot green"></div>
+        <strong style="margin-left:8px;">Recensement</strong>
+    </div>
+    <div class="content" id="recensementContent"></div>
+</div>
+
+<script>
+// --- LISTE DES OBJETS ---
+const items = [
+    { name: "Fusil FA-5", category: "Arme légère" },
+    { name: "Pistolet PX-9", category: "Arme légère" },
+    { name: "Mitrailleuse MG-7", category: "Arme lourde" },
+    { name: "Kevlar (S)", category: "Protection" },
+    { name: "Kevlar (M)", category: "Protection" },
+    { name: "Munitions 5.56mm", category: "Munition" },
+    { name: "Munitions 7.62mm", category: "Munition" }
+];
+
+// --- GÉNÉRATION AUTOMATIQUE PAR MOI ---
+function randomStock() {
+    return Math.floor(Math.random() * 40) + 5;
+}
+function randomSerials(amount) {
+    let out = [];
+    for (let i = 0; i < amount; i++) {
+        out.push("SN-" + (100000 + Math.floor(Math.random()*900000)));
+    }
+    return out;
+}
+
+// Stock & recensement affichés automatiquement
+let sc = document.getElementById("stocksContent");
+let rc = document.getElementById("recensementContent");
+
+items.forEach(item => {
+    let stock = randomStock();
+    let serials = randomSerials(stock);
+
+    sc.innerHTML += `
+        <div class="item">
+            <strong>${item.name}</strong><br>
+            Catégorie : ${item.category}<br>
+            Stock : <strong>${stock}</strong>
+        </div>
+    `;
+
+    rc.innerHTML += `
+        <div class="item">
+            <strong>${item.name}</strong><br>
+            Numéros (${serials.length}) :
+            <div class="serials">${serials.join("\n")}</div>
+        </div>
+    `;
+});
+
+// --- DÉPLACEMENT DES FENÊTRES ---
+function makeDraggable(win) {
+    const bar = win.querySelector(".titlebar");
+    let offsetX = 0, offsetY = 0, dragging = false;
+
+    bar.addEventListener("mousedown", e => {
+        dragging = true;
+        offsetX = e.clientX - win.offsetLeft;
+        offsetY = e.clientY - win.offsetTop;
+        bar.style.cursor = "grabbing";
+    });
+
+    document.addEventListener("mouseup", () => {
+        dragging = false;
+        bar.style.cursor = "grab";
+    });
+
+    document.addEventListener("mousemove", e => {
+        if (dragging) {
+            win.style.left = (e.clientX - offsetX) + "px";
+            win.style.top = (e.clientY - offsetY) + "px";
+        }
+    });
+}
+
+makeDraggable(document.getElementById("winStocks"));
+makeDraggable(document.getElementById("winRecensement"));
+</script>
+
+</body>
+</html>
