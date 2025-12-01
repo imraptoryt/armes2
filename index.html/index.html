@@ -14,7 +14,6 @@
         overflow: hidden;
     }
 
-    /* Fenêtres */
     .window {
         width: 420px;
         height: 300px;
@@ -25,12 +24,11 @@
         position: absolute;
         box-shadow: 0 10px 30px rgba(0,0,0,0.25);
         overflow: hidden;
-        resize: both;          /* <--- Redimensionnable */
+        resize: both;
         min-width: 300px;
         min-height: 200px;
     }
 
-    /* Barre de titre style macOS */
     .titlebar {
         height: 30px;
         display: flex;
@@ -42,11 +40,7 @@
         background: rgba(255,255,255,0.15);
     }
 
-    .dot {
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-    }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
     .red { background: #ff5f57; }
     .orange { background: #ffbd2e; }
     .green { background: #28c840; }
@@ -79,7 +73,6 @@
 </head>
 <body>
 
-<!-- Fenêtre STOCKS -->
 <div class="window" id="winStocks" style="left: 40px; top: 40px;">
     <div class="titlebar">
         <div class="dot red"></div>
@@ -90,7 +83,6 @@
     <div class="content" id="stocksContent"></div>
 </div>
 
-<!-- Fenêtre RECENSEMENT -->
 <div class="window" id="winRecensement" style="left: 520px; top: 140px;">
     <div class="titlebar">
         <div class="dot red"></div>
@@ -102,55 +94,40 @@
 </div>
 
 <script>
-// --- LISTE DES OBJETS ---
+// --- LISTE DES OBJETS AVEC QUANTITÉ ET NUMÉROS DE SÉRIE MAX 4 CHIFFRES ---
 const items = [
-    { name: "Fusil FA-5", category: "Arme légère" },
-    { name: "Pistolet PX-9", category: "Arme légère" },
-    { name: "Mitrailleuse MG-7", category: "Arme lourde" },
-    { name: "Kevlar (S)", category: "Protection" },
-    { name: "Kevlar (M)", category: "Protection" },
-    { name: "Munitions 5.56mm", category: "Munition" },
-    { name: "Munitions 7.62mm", category: "Munition" }
+    { name: "Berreta", category: "Arme légère", quantity: 12, serials: ["ARC-4821","ARC-0394","ARC-7710","ARC-1552","ARC-9083","ARC-6271","ARC-4419","ARC-5032","ARC-1197","ARC-7748","ARC-2660","ARC-9304"] },
+    { name: "Glock 17", category: "Arme légère", quantity: 8, serials: ["ARC-0442","ARC-9190","ARC-3811","ARC-7056","ARC-1209","ARC-6674","ARC-2043","ARC-5827"] },
+    { name: "M4A1", category: "Arme lourde", quantity: 5, serials: ["ARC-6502","ARC-7721","ARC-9440","ARC-0135","ARC-5883"] },
+    { name: "Kevlar (F)", category: "Protection", quantity: 10, serials: ["ARC-9914","ARC-0038","ARC-7442","ARC-5149","ARC-2070","ARC-4322","ARC-8167","ARC-0561","ARC-6325","ARC-4400"] },
+    { name: "Kevlar (H)", category: "Protection", quantity: 7, serials: ["ARC-7009","ARC-2458","ARC-9881","ARC-3104","ARC-4733","ARC-0520","ARC-8947"] },
+    { name: "Munitions 9mm", category: "Munition", quantity: 200 },
+    { name: "Munitions 5.56mm", category: "Munition", quantity: 150 }
 ];
 
-// --- GÉNÉRATION AUTOMATIQUE PAR MOI ---
-function randomStock() {
-    return Math.floor(Math.random() * 40) + 5;
-}
-function randomSerials(amount) {
-    let out = [];
-    for (let i = 0; i < amount; i++) {
-        out.push("SN-" + (100000 + Math.floor(Math.random()*900000)));
-    }
-    return out;
-}
-
-// Stock & recensement affichés automatiquement
 let sc = document.getElementById("stocksContent");
 let rc = document.getElementById("recensementContent");
 
 items.forEach(item => {
-    let stock = randomStock();
-    let serials = randomSerials(stock);
-
     sc.innerHTML += `
         <div class="item">
             <strong>${item.name}</strong><br>
             Catégorie : ${item.category}<br>
-            Stock : <strong>${stock}</strong>
+            Stock : <strong>${item.quantity}</strong>
         </div>
     `;
 
-    rc.innerHTML += `
-        <div class="item">
-            <strong>${item.name}</strong><br>
-            Numéros (${serials.length}) :
-            <div class="serials">${serials.join("\n")}</div>
-        </div>
-    `;
+    if(item.serials){
+        rc.innerHTML += `
+            <div class="item">
+                <strong>${item.name}</strong><br>
+                Numéros (${item.serials.length}) :
+                <div class="serials">${item.serials.join("\n")}</div>
+            </div>
+        `;
+    }
 });
 
-// --- DÉPLACEMENT DES FENÊTRES ---
 function makeDraggable(win) {
     const bar = win.querySelector(".titlebar");
     let offsetX = 0, offsetY = 0, dragging = false;
