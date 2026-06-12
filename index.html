@@ -3,841 +3,304 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>D.H.S. — San Andreas Secure Terminal</title>
+<title>Black Vulture — Inventaire</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
-    --bg:#070a0f;--bg2:#0b0f16;--panel:#11161f;--panel2:#161d28;--panel3:#1c2531;
-    --line:#222c3a;--line2:#2c3848;--txt:#c4cdd9;--txt-dim:#73808f;--txt-faint:#46505d;
-    --amber:#e0a93a;--amber-d:#c08f2c;--gold:#f0c659;--red:#d23f33;--red-d:#9e2a20;
-    --green:#43b25a;--blue:#3d7dd6;
+    --bg:#0a0a0c; --bg2:#101013; --panel:#16161a; --panel2:#1d1d22; --panel3:#26262d;
+    --line:#2a2a31; --line2:#37373f;
+    --txt:#e8e6e3; --txt-dim:#9a978f; --txt-faint:#5f5c57;
+    --orange:#ff7a00; --orange-d:#cc6200; --orange-l:#ffa040; --amber:#ffb347;
+    --green:#3fb950; --red:#f04438; --blue:#4493f8;
     --mono:ui-monospace,"SF Mono","Cascadia Code","Roboto Mono",Menlo,Consolas,monospace;
     --sans:"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%;overflow:hidden}
-  body{font-family:var(--sans);background:var(--bg);color:var(--txt);user-select:none;-webkit-user-select:none}
-  ::-webkit-scrollbar{width:9px;height:9px}::-webkit-scrollbar-track{background:transparent}
-  ::-webkit-scrollbar-thumb{background:#2a3543;border-radius:5px}::-webkit-scrollbar-thumb:hover{background:#39475a}
+  html,body{min-height:100%}
+  body{font-family:var(--sans);background:radial-gradient(1100px 600px at 85% -5%,rgba(255,122,0,.08),transparent 55%),radial-gradient(900px 500px at 5% 105%,rgba(255,122,0,.05),transparent 55%),var(--bg);color:var(--txt);min-height:100vh}
+  ::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:#33333b;border-radius:6px}::-webkit-scrollbar-thumb:hover{background:#44444e}
+  a{color:var(--orange-l);text-decoration:none}
 
-  #boot{position:fixed;inset:0;z-index:9000;background:#05070b;font-family:var(--mono);font-size:13px;color:#7d8a99;padding:48px 60px;line-height:1.85;overflow:hidden}
-  #boot .bline{opacity:0;white-space:pre} #boot .seal-boot{color:var(--amber);font-weight:bold;letter-spacing:2px;margin-bottom:18px;opacity:0}
-  #boot .ok{color:var(--green)} #boot .warn{color:var(--amber)}
+  /* ===== HEADER ===== */
+  .topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:16px;padding:14px 28px;background:linear-gradient(180deg,rgba(16,16,19,.96),rgba(16,16,19,.82));backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .logo{width:46px;height:46px;border-radius:11px;object-fit:cover;border:1px solid var(--line2);background:#000;box-shadow:0 0 0 3px rgba(255,122,0,.10),0 8px 22px rgba(0,0,0,.5)}
+  .brand{display:flex;flex-direction:column;line-height:1.1}
+  .brand .bn{font-size:19px;font-weight:800;letter-spacing:1px}
+  .brand .bn span{color:var(--orange)}
+  .brand .bs{font-size:10.5px;letter-spacing:3px;color:var(--txt-dim);text-transform:uppercase;margin-top:3px;font-family:var(--mono)}
+  .top-right{margin-left:auto;display:flex;align-items:center;gap:18px}
+  .sync-pill{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;color:var(--txt-dim);padding:6px 12px;border:1px solid var(--line2);border-radius:20px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--txt-faint);transition:.3s}
+  .dot.live{background:var(--green);box-shadow:0 0 8px var(--green)}
+  .dot.off{background:var(--red);box-shadow:0 0 8px var(--red)}
 
-  #login{position:fixed;inset:0;z-index:8000;display:none;align-items:center;justify-content:center;flex-direction:column;background:radial-gradient(900px 600px at 50% 38%,rgba(224,169,58,.06),transparent 70%),linear-gradient(160deg,#0a0f17,#05070c 60%)}
-  #login::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.012) 1px,transparent 1px);background-size:34px 34px;pointer-events:none}
-  .login-seal{width:96px;height:96px;border-radius:50%;border:2px solid var(--amber-d);display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 35%,#1a2230,#0c111a);box-shadow:0 0 0 6px rgba(224,169,58,.07),0 14px 40px rgba(0,0,0,.6);margin-bottom:22px}
-  .login-seal svg{width:54px;height:54px}
-  .login-cls{font-family:var(--mono);font-size:10px;letter-spacing:3px;color:var(--red);border:1px solid var(--red-d);padding:3px 11px;border-radius:3px;margin-bottom:8px;background:rgba(210,63,51,.07)}
-  .login-dept{font-size:13px;letter-spacing:6px;color:var(--amber);text-transform:uppercase;margin-bottom:4px;font-weight:600}
-  .login-sub{font-size:11px;letter-spacing:2px;color:var(--txt-dim);margin-bottom:34px;text-transform:uppercase}
-  .agent-card{width:330px;background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:22px;position:relative;z-index:2;box-shadow:0 24px 60px rgba(0,0,0,.55)}
-  .agent-row{display:flex;gap:14px;align-items:center;margin-bottom:22px}
-  .agent-pfp{width:52px;height:52px;border-radius:8px;flex-shrink:0;background:linear-gradient(150deg,#2a3543,#161d28);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--amber);font-family:var(--mono)}
-  .agent-name{font-size:15px;font-weight:600;color:#dfe6ef} .agent-id{font-size:11px;color:var(--txt-dim);font-family:var(--mono);margin-top:2px}
-  .auth-btn{width:100%;padding:13px;border-radius:8px;border:1px solid var(--amber-d);background:linear-gradient(#3a2c0d,#2a2008);color:var(--gold);font-family:var(--mono);font-size:13px;letter-spacing:2px;cursor:pointer;transition:.14s;display:flex;align-items:center;justify-content:center;gap:9px}
-  .auth-btn:hover{background:linear-gradient(#473614,#332710)} .auth-btn svg{width:16px;height:16px}
-  .auth-scan{font-family:var(--mono);font-size:11px;color:var(--txt-dim);text-align:center;margin-top:14px;min-height:14px}
+  /* ===== LAYOUT ===== */
+  .wrap{max-width:1280px;margin:0 auto;padding:26px 28px 60px}
 
-  #desktop{position:fixed;inset:0;display:none;flex-direction:column;background:radial-gradient(1200px 700px at 78% 12%,rgba(224,169,58,.05),transparent 60%),radial-gradient(900px 600px at 12% 88%,rgba(61,125,214,.05),transparent 60%),linear-gradient(155deg,#0a0e15,#06090e)}
-  #desktop::before{content:"";position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.01) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.01) 1px,transparent 1px);background-size:40px 40px}
-  .bg-seal{position:absolute;top:50%;left:50%;transform:translate(-50%,-54%);width:430px;height:430px;opacity:.035;pointer-events:none}
-  .bg-watermark{position:absolute;bottom:84px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:11px;letter-spacing:5px;color:#fff;opacity:.04;pointer-events:none;text-transform:uppercase}
+  /* ===== STAT CARDS ===== */
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:26px}
+  .stat{background:linear-gradient(160deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:14px;padding:18px 20px;position:relative;overflow:hidden}
+  .stat::after{content:"";position:absolute;right:-20px;top:-20px;width:90px;height:90px;background:radial-gradient(circle,rgba(255,122,0,.14),transparent 70%)}
+  .stat .sv{font-size:30px;font-weight:800;letter-spacing:.5px}
+  .stat .sl{font-size:11px;letter-spacing:1.5px;color:var(--txt-dim);text-transform:uppercase;margin-top:4px;font-family:var(--mono)}
+  .stat .si{position:absolute;right:16px;top:16px;opacity:.5}
 
-  .topbar{height:30px;background:linear-gradient(#0c1019,#090c13);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 14px;gap:14px;font-size:11px;z-index:50;position:relative;flex-shrink:0;font-family:var(--mono)}
-  .topbar .cls-tag{color:var(--red);letter-spacing:2px;font-weight:bold} .topbar .sep{color:var(--txt-faint)} .topbar .dept-tag{color:var(--amber);letter-spacing:2px}
-  .topbar .right{margin-left:auto;display:flex;gap:16px;align-items:center;color:var(--txt-dim)}
-  .stat-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);display:inline-block;margin-right:5px}
-  .stat-dot.warn{background:var(--amber);box-shadow:0 0 6px var(--amber)} .stat-dot.bad{background:var(--red);box-shadow:0 0 6px var(--red)}
+  /* ===== TOOLBAR ===== */
+  .toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:22px}
+  .search{flex:1;min-width:200px;display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:11px 15px}
+  .search input{flex:1;background:transparent;border:none;outline:none;color:var(--txt);font-size:14px;font-family:var(--sans)}
+  .search svg{flex-shrink:0;opacity:.6}
+  .cats{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{padding:9px 15px;border-radius:20px;border:1px solid var(--line2);background:var(--panel);color:var(--txt-dim);font-size:12.5px;cursor:pointer;transition:.14s;font-family:var(--mono);display:flex;align-items:center;gap:7px;white-space:nowrap}
+  .chip:hover{border-color:var(--orange-d);color:var(--txt)}
+  .chip.active{background:linear-gradient(180deg,var(--orange),var(--orange-d));border-color:var(--orange);color:#1a0f00;font-weight:700}
+  .chip .cc{font-size:10px;opacity:.8}
 
-  .icons{position:absolute;top:48px;left:18px;display:flex;flex-direction:column;gap:4px;z-index:10}
-  .dicon{width:88px;padding:9px 6px;border-radius:8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:7px;transition:.12s;border:1px solid transparent;text-align:center}
-  .dicon:hover{background:rgba(224,169,58,.07);border-color:rgba(224,169,58,.18)}
-  .dicon .ic{width:40px;height:40px;display:flex;align-items:center;justify-content:center}
-  .dicon .lbl{font-size:11px;color:var(--txt);line-height:1.25;text-shadow:0 1px 3px #000}
+  /* ===== STORAGE SECTIONS ===== */
+  .storage{margin-bottom:24px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--panel)}
+  .storage-head{display:flex;align-items:center;gap:13px;padding:15px 20px;background:linear-gradient(180deg,var(--panel2),var(--panel));border-bottom:1px solid var(--line);cursor:pointer}
+  .storage-head .shic{width:36px;height:36px;border-radius:9px;background:rgba(255,122,0,.12);border:1px solid var(--orange-d);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .storage-head .shn{font-size:16px;font-weight:700;letter-spacing:.4px}
+  .storage-head .shm{font-size:11px;color:var(--txt-dim);font-family:var(--mono);margin-top:2px}
+  .storage-head .shtot{margin-left:auto;font-family:var(--mono);font-size:13px;color:var(--orange-l);background:rgba(255,122,0,.08);border:1px solid var(--orange-d);padding:5px 12px;border-radius:8px}
+  .storage-head .chev{margin-left:14px;transition:.2s;opacity:.6}
+  .storage.collapsed .chev{transform:rotate(-90deg)}
+  .storage.collapsed .grid{display:none}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:12px;padding:18px}
+  .item{background:linear-gradient(160deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;align-items:center;gap:13px;transition:.14s;position:relative}
+  .item:hover{border-color:var(--orange-d);transform:translateY(-2px);box-shadow:0 10px 28px rgba(0,0,0,.4)}
+  .item .iic{width:42px;height:42px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(255,122,0,.10);border:1px solid var(--line2)}
+  .item .iname{font-size:14px;font-weight:600;line-height:1.25}
+  .item .icat{font-size:10px;color:var(--txt-faint);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-top:3px}
+  .item .iqty{margin-left:auto;font-family:var(--mono);font-size:20px;font-weight:800;color:var(--orange-l)}
+  .item.low .iqty{color:var(--red)}
+  .item .ibadge{position:absolute;top:-7px;right:10px;font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:10px;font-weight:700}
+  .item .ibadge.up{background:rgba(63,185,80,.16);color:var(--green);border:1px solid #2c7a37}
+  .item .ibadge.down{background:rgba(240,68,56,.16);color:var(--red);border:1px solid #9e2a20}
 
-  .taskbar{margin-top:auto;height:50px;background:linear-gradient(#0c1119,#080b11);border-top:1px solid var(--line);display:flex;align-items:center;padding:0 12px;gap:8px;z-index:60;position:relative;flex-shrink:0}
-  .start-btn{display:flex;align-items:center;gap:9px;padding:7px 14px;border-radius:7px;cursor:pointer;border:1px solid var(--line2);background:var(--panel2);transition:.12s}
-  .start-btn:hover{border-color:var(--amber-d);background:var(--panel3)} .start-btn svg{width:18px;height:18px} .start-btn span{font-size:12px;letter-spacing:2px;color:var(--amber);font-family:var(--mono)}
-  .task-apps{display:flex;gap:6px;overflow:hidden}
-  .task-app{height:34px;padding:0 12px;border-radius:6px;border:1px solid var(--line);background:var(--panel);display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12px;color:var(--txt-dim);transition:.12s;white-space:nowrap}
-  .task-app:hover{color:var(--txt);border-color:var(--line2)} .task-app.active{border-color:var(--amber-d);color:var(--amber);background:var(--panel2)}
-  .tray{margin-left:auto;display:flex;align-items:center;gap:14px;font-family:var(--mono);font-size:11px;color:var(--txt-dim)}
-  .tray .sync-ind{display:flex;align-items:center;gap:5px;color:var(--green)} .tray .sync-ind .stat-dot{margin:0}
-  .tray .clock{font-size:13px;color:var(--txt);letter-spacing:1px}
-  .tray .usb-tray{display:flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid var(--line2);border-radius:6px;cursor:pointer;transition:.12s}
-  .tray .usb-tray:hover{border-color:var(--amber-d)} .tray .usb-tray.gone{opacity:.35} .tray .usb-tray.pulse{border-color:var(--red);animation:usbpulse 1s infinite} .tray .usb-tray svg{width:14px;height:14px}
-  @keyframes usbpulse{50%{box-shadow:0 0 12px rgba(210,63,51,.6);background:rgba(210,63,51,.1)}}
+  .empty{padding:70px 20px;text-align:center;color:var(--txt-faint);font-family:var(--mono)}
+  .empty svg{opacity:.3;margin-bottom:16px}
 
-  .win{position:absolute;background:var(--panel);border:1px solid var(--line2);border-radius:10px;box-shadow:0 28px 70px rgba(0,0,0,.6),0 0 0 1px rgba(0,0,0,.4);display:none;flex-direction:column;overflow:hidden;z-index:100;min-width:320px;min-height:220px}
-  .win.open{display:flex;animation:winpop .16s ease} .win.maxed{border-radius:0}
-  @keyframes winpop{from{opacity:0;transform:scale(.98)}to{opacity:1;transform:scale(1)}}
-  .win-bar{height:38px;background:linear-gradient(#161d27,#11161f);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 12px;gap:10px;cursor:grab;flex-shrink:0}
-  .win-bar:active{cursor:grabbing}
-  .win-bar .wtitle{font-size:12px;color:var(--txt);letter-spacing:1px;font-family:var(--mono);display:flex;align-items:center;gap:8px;pointer-events:none} .win-bar .wtitle svg{width:14px;height:14px}
-  .win-ctrls{margin-left:auto;display:flex;gap:8px}
-  .wc{width:13px;height:13px;border-radius:50%;cursor:pointer;border:1px solid rgba(0,0,0,.3)} .wc.min{background:#e0a93a} .wc.max{background:#43b25a} .wc.close{background:#d23f33} .wc:hover{filter:brightness(1.25)}
-  .win-body{flex:1;overflow:auto;position:relative}
-  .win-resize{position:absolute;right:0;bottom:0;width:18px;height:18px;cursor:nwse-resize;z-index:5}
-  .win-resize::after{content:"";position:absolute;right:3px;bottom:3px;width:8px;height:8px;border-right:2px solid var(--line2);border-bottom:2px solid var(--line2)}
+  /* ===== ACTIVITY FEED ===== */
+  .feed-title{display:flex;align-items:center;gap:10px;font-size:14px;letter-spacing:2px;text-transform:uppercase;color:var(--txt-dim);font-family:var(--mono);margin:34px 0 16px}
+  .feed-title::before,.feed-title::after{content:"";flex:1;height:1px;background:var(--line)}
+  .feed{display:flex;flex-direction:column;gap:8px}
+  .fline{display:flex;align-items:center;gap:13px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 16px;font-size:13px}
+  .fline .fdot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+  .fline.up .fdot{background:var(--green)} .fline.down .fdot{background:var(--red)}
+  .fline .fdelta{font-family:var(--mono);font-weight:800;min-width:46px}
+  .fline.up .fdelta{color:var(--green)} .fline.down .fdelta{color:var(--red)}
+  .fline .fitem{font-weight:600}
+  .fline .floc{color:var(--txt-dim);font-family:var(--mono);font-size:12px}
+  .fline .ftime{margin-left:auto;color:var(--txt-faint);font-family:var(--mono);font-size:11px}
 
-  .term{background:#06090d;font-family:var(--mono);font-size:13px;padding:14px 16px;min-height:100%;color:#a9b6c4;line-height:1.6}
-  .term .out{white-space:pre-wrap;word-break:break-word}
-  .term .ln-amber{color:var(--amber)} .term .ln-green{color:var(--green)} .term .ln-red{color:var(--red)} .term .ln-blue{color:var(--blue)} .term .ln-dim{color:var(--txt-faint)}
-  .term-input-row{display:flex;align-items:center;gap:8px;margin-top:2px} .term-prompt{color:var(--amber);flex-shrink:0}
-  .term-input{flex:1;background:transparent;border:none;outline:none;color:#cdd9e6;font-family:var(--mono);font-size:13px;caret-color:var(--amber)}
+  .footer{text-align:center;color:var(--txt-faint);font-family:var(--mono);font-size:11px;margin-top:50px;letter-spacing:1px}
 
-  .notes-wrap{display:flex;height:100%}
-  .notes-list{width:185px;background:var(--bg2);border-right:1px solid var(--line);flex-shrink:0;overflow:auto}
-  .note-item{padding:11px 13px;border-bottom:1px solid var(--line);cursor:pointer;transition:.1s} .note-item:hover{background:var(--panel2)} .note-item.active{background:var(--panel3);border-left:2px solid var(--amber)}
-  .note-item .nt{font-size:12px;color:var(--txt);margin-bottom:3px} .note-item .nd{font-size:10px;color:var(--txt-faint);font-family:var(--mono)}
-  .notes-content{flex:1;padding:20px 24px;overflow:auto;font-size:13px;line-height:1.7;color:#b8c3d0}
-  .notes-content h3{font-size:15px;color:var(--amber);margin-bottom:14px;letter-spacing:1px;font-family:var(--mono)}
-  .notes-content code{background:#0a0e14;border:1px solid var(--line2);padding:2px 7px;border-radius:4px;font-family:var(--mono);color:var(--gold);font-size:12px}
-  .notes-content .cmd-block,.doc-body .cmd-block{background:#06090d;border:1px solid var(--line2);border-left:3px solid var(--amber);border-radius:6px;padding:13px 15px;margin:13px 0;font-family:var(--mono);font-size:12.5px;color:#a9b6c4;line-height:1.9}
-  .notes-content .cmd-block .c,.doc-body .cmd-block .c{color:var(--gold)} .notes-content .cmd-block .step,.doc-body .cmd-block .step{color:var(--blue)}
-  .notes-content p{margin-bottom:10px} .notes-content ol{margin:0 0 10px 18px} .notes-content li{margin-bottom:7px}
-  .notes-content .warn-note,.doc-body .warn-note{color:var(--red);font-size:12px;border:1px solid var(--red-d);background:rgba(210,63,51,.06);padding:9px 12px;border-radius:6px;margin-top:8px;font-family:var(--mono)}
-  .notes-content .ok-note{color:var(--green);font-size:12px;border:1px solid #2c5a36;background:rgba(67,178,90,.06);padding:9px 12px;border-radius:6px;margin-top:8px;font-family:var(--mono)}
-
-  .files-wrap{display:flex;height:100%}
-  .files-side{width:190px;background:var(--bg2);border-right:1px solid var(--line);flex-shrink:0;padding:10px 0;overflow:auto}
-  .files-side .sg{font-size:9px;letter-spacing:2px;color:var(--txt-faint);text-transform:uppercase;padding:10px 14px 6px;font-family:var(--mono)}
-  .drive{padding:9px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;font-size:12px;color:var(--txt-dim);transition:.1s} .drive:hover{background:var(--panel2);color:var(--txt)} .drive.active{background:var(--panel3);color:var(--txt);border-left:2px solid var(--amber)}
-  .drive svg{width:16px;height:16px;flex-shrink:0} .drive .dmeta{font-size:9px;color:var(--txt-faint);font-family:var(--mono)}
-  .drive.usb-drive{color:var(--amber)} .drive.usb-drive.removed{opacity:.3;pointer-events:none}
-  .drive-bar{height:3px;background:#0a0e14;border-radius:2px;margin-top:4px;overflow:hidden} .drive-bar i{display:block;height:100%;background:var(--amber-d)}
-  .files-main{flex:1;padding:14px;overflow:auto}
-  .files-path{font-family:var(--mono);font-size:11px;color:var(--txt-dim);margin-bottom:14px;padding:7px 11px;background:var(--bg2);border:1px solid var(--line);border-radius:6px;display:flex;align-items:center;gap:7px}
-  .files-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(94px,1fr));gap:8px}
-  .fitem{padding:13px 8px;border-radius:8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;border:1px solid transparent;transition:.1s} .fitem:hover{background:rgba(224,169,58,.06);border-color:rgba(224,169,58,.16)}
-  .fitem svg{width:38px;height:38px} .fitem .fl{font-size:11px;color:var(--txt);line-height:1.3;word-break:break-word} .fitem .fsz{font-size:9px;color:var(--txt-faint);font-family:var(--mono)} .fitem.locked .fl{color:var(--red)}
-
-  .doc{padding:0;min-height:100%;background:#0c1018}
-  .doc-head{padding:24px 30px 18px;border-bottom:1px solid var(--line);background:linear-gradient(#11161f,#0c1018)}
-  .doc-cls{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:3px;color:var(--red);border:1px solid var(--red-d);padding:3px 10px;border-radius:3px;margin-bottom:14px;background:rgba(210,63,51,.06)}
-  .doc-title{font-size:19px;color:#e3e9f0;margin-bottom:6px;letter-spacing:.5px}
-  .doc-meta{font-family:var(--mono);font-size:11px;color:var(--txt-dim);display:flex;gap:18px;flex-wrap:wrap;margin-top:10px}
-  .doc-body{padding:24px 30px;font-size:13.5px;line-height:1.85;color:#b3bdca}
-  .doc-body h4{color:var(--amber);font-size:13px;letter-spacing:2px;text-transform:uppercase;margin:22px 0 10px;font-family:var(--mono)} .doc-body p{margin-bottom:12px}
-  .doc-body .redacted{background:#000;color:#000;padding:0 4px;border-radius:2px;user-select:none}
-  .doc-body table{width:100%;border-collapse:collapse;margin:14px 0;font-size:12px} .doc-body td,.doc-body th{border:1px solid var(--line2);padding:8px 11px;text-align:left;font-family:var(--mono)} .doc-body th{background:var(--panel2);color:var(--amber);font-size:10px;letter-spacing:1px;text-transform:uppercase}
-  .doc-body .flag{color:var(--red);font-family:var(--mono);font-size:11px}
-  .doc-stamp{position:absolute;top:120px;right:40px;border:3px solid var(--red-d);color:var(--red);font-family:var(--mono);font-size:22px;font-weight:bold;letter-spacing:4px;padding:8px 18px;transform:rotate(-14deg);opacity:.5;border-radius:4px;pointer-events:none}
-
-  .calc{padding:16px;height:100%;display:flex;flex-direction:column;gap:10px;background:#0a0e14}
-  .calc-screen{background:#06090d;border:1px solid var(--line2);border-radius:8px;padding:16px;text-align:right;font-family:var(--mono);font-size:26px;color:var(--amber);min-height:60px;word-break:break-all}
-  .calc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;flex:1}
-  .calc-btn{border:1px solid var(--line2);border-radius:7px;background:var(--panel2);color:var(--txt);font-family:var(--mono);font-size:17px;cursor:pointer;transition:.1s;display:flex;align-items:center;justify-content:center} .calc-btn:hover{background:var(--panel3);border-color:var(--amber-d)} .calc-btn.op{color:var(--amber)} .calc-btn.eq{background:linear-gradient(#3a2c0d,#2a2008);color:var(--gold);border-color:var(--amber-d)}
-  .pad-app{padding:0;height:100%} .pad-app textarea{width:100%;height:100%;background:#0a0e14;border:none;outline:none;color:#b8c3d0;font-family:var(--mono);font-size:13px;padding:16px;resize:none;line-height:1.7}
-  .clock-app{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(600px 400px at 50% 40%,rgba(224,169,58,.05),transparent),#0a0e14}
-  .clock-app .big{font-family:var(--mono);font-size:54px;color:var(--amber);letter-spacing:4px} .clock-app .date{font-family:var(--mono);font-size:13px;color:var(--txt-dim);margin-top:8px;letter-spacing:2px}
-  .gallery{padding:16px;height:100%;overflow:auto;background:#0a0e14;display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
-  .gphoto{border:1px solid var(--line2);border-radius:8px;overflow:hidden;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:var(--txt-faint);position:relative} .gphoto .lbl{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.6);padding:5px 8px;font-size:10px;color:var(--txt-dim)}
-
-  .db-lock{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(700px 500px at 50% 40%,rgba(210,63,51,.06),transparent 70%),#0a0e14;padding:34px}
-  .db-lock .lockic{width:60px;height:60px;margin-bottom:18px}
-  .db-lock .lt{font-size:16px;color:#e3e9f0;letter-spacing:2px;margin-bottom:5px;font-family:var(--mono)} .db-lock .ls{font-size:11px;color:var(--txt-dim);margin-bottom:8px;font-family:var(--mono);text-align:center}
-  .db-lock .lstatus{font-size:11px;color:var(--red);margin-bottom:24px;font-family:var(--mono);min-height:16px;text-align:center}
-  .db-code-box{display:flex;gap:9px;margin-bottom:14px}
-  .db-cell{width:46px;height:56px;border:1px solid var(--line2);border-radius:8px;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:26px;color:var(--amber)} .db-cell.filled{border-color:var(--amber-d);box-shadow:0 0 0 1px rgba(224,169,58,.3)} .db-cell.err{border-color:var(--red);animation:shake .4s}
-  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
-  .db-keypad{display:grid;grid-template-columns:repeat(3,52px);gap:9px;margin-top:6px}
-  .db-key{height:46px;border:1px solid var(--line2);border-radius:8px;background:var(--panel2);color:var(--txt);font-family:var(--mono);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.1s} .db-key:hover{background:var(--panel3);border-color:var(--amber-d)} .db-key:active{transform:scale(.94)}
-  .db-hint{font-size:10px;color:var(--txt-faint);font-family:var(--mono);margin-top:16px;text-align:center;max-width:260px;line-height:1.6}
-  .db-main{min-height:100%;display:flex;flex-direction:column;background:#0a0e14}
-  .db-toolbar{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;background:linear-gradient(#11161f,#0c1018)} .db-toolbar .dbt-title{font-family:var(--mono);font-size:13px;color:var(--amber);letter-spacing:2px} .db-toolbar .dbt-sub{font-family:var(--mono);font-size:10px;color:var(--green)} .db-toolbar .dbt-sub::before{content:"●";margin-right:5px}
-  .db-content{flex:1;padding:18px} .db-section-title{font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--txt-dim);text-transform:uppercase;margin:6px 0 12px}
-  .db-records{display:flex;flex-direction:column;gap:8px;margin-bottom:22px}
-  .db-rec{display:flex;align-items:center;gap:14px;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:8px} .db-rec svg{width:22px;height:22px;flex-shrink:0;color:var(--amber)} .db-rec .rinfo{flex:1} .db-rec .rname{font-size:12.5px;color:var(--txt)} .db-rec .rmeta{font-size:10px;color:var(--txt-faint);font-family:var(--mono);margin-top:2px} .db-rec .rsize{font-family:var(--mono);font-size:11px;color:var(--txt-dim)} .db-rec .rcls{font-family:var(--mono);font-size:9px;color:var(--red);border:1px solid var(--red-d);padding:2px 6px;border-radius:3px}
-  .copy-panel{background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:18px}
-  .copy-head{display:flex;align-items:center;gap:10px;margin-bottom:4px} .copy-head svg{width:18px;height:18px;color:var(--amber)} .copy-head .ch-title{font-size:13px;color:var(--txt);letter-spacing:1px}
-  .copy-target{font-family:var(--mono);font-size:11px;color:var(--txt-dim);margin-bottom:16px;padding-left:28px}
-  .copy-btn-row{display:flex;gap:10px}
-  .btn{padding:11px 18px;border-radius:7px;border:1px solid var(--line2);background:var(--panel2);color:var(--txt);font-family:var(--mono);font-size:12px;letter-spacing:1px;cursor:pointer;transition:.12s;display:flex;align-items:center;gap:8px} .btn:hover{border-color:var(--amber-d)} .btn svg{width:14px;height:14px}
-  .btn.primary{background:linear-gradient(#3a2c0d,#2a2008);border-color:var(--amber-d);color:var(--gold)} .btn.primary:hover{background:linear-gradient(#473614,#332710)}
-  .btn.danger{border-color:var(--red-d);color:var(--red)} .btn.danger:hover{background:rgba(210,63,51,.1)} .btn:disabled{opacity:.4;cursor:not-allowed}
-  .dl-zone{margin-top:18px;display:none} .dl-zone.show{display:block;animation:winpop .2s}
-  .dl-status-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px} .dl-status{font-family:var(--mono);font-size:12px;color:var(--amber)} .dl-status.done{color:var(--green)} .dl-status.paused{color:var(--red)} .dl-pct{font-family:var(--mono);font-size:13px;color:var(--txt)}
-  .dl-track{height:14px;background:#06090d;border:1px solid var(--line2);border-radius:8px;overflow:hidden;position:relative} .dl-fill{height:100%;width:0;background:linear-gradient(90deg,var(--amber-d),var(--gold));transition:width .4s linear;position:relative} .dl-fill::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent);background-size:30px 100%;animation:shimmer 1.2s linear infinite}
-  @keyframes shimmer{from{background-position:-30px}to{background-position:300px}}
-  .dl-meta{display:flex;justify-content:space-between;margin-top:9px;font-family:var(--mono);font-size:11px;color:var(--txt-dim)} .dl-meta b{color:var(--txt)}
-  .dl-controls{display:flex;gap:9px;margin-top:14px;flex-wrap:wrap;align-items:center}
-  .usb-prompt{margin-top:14px;border:1px solid var(--red-d);background:rgba(210,63,51,.08);border-radius:8px;padding:12px 14px;font-family:var(--mono);font-size:12px;color:#e8a59f;display:flex;align-items:center;gap:10px;animation:usbpulse 1.4s infinite}
-  .usb-prompt svg{width:18px;height:18px;flex-shrink:0;color:var(--red)}
-
-  #hack{position:fixed;inset:0;z-index:7500;display:none;background:#04060a;overflow:hidden;font-family:var(--mono)} #hack.show{display:block}
-  #hack .matrix{position:absolute;inset:0;opacity:.18;pointer-events:none;font-size:13px;line-height:1.05;color:#43b25a;white-space:pre;overflow:hidden;letter-spacing:1px}
-  #hack .scan{position:absolute;left:0;right:0;height:120px;background:linear-gradient(transparent,rgba(67,178,90,.07),transparent);animation:scanmove 2.4s linear infinite}
-  @keyframes scanmove{from{top:-120px}to{top:100%}}
-  #hack .panel{position:absolute;inset:0;display:flex;flex-direction:column;padding:6vh 8vw}
-  #hack .hh{display:flex;align-items:center;gap:14px;margin-bottom:18px}
-  #hack .hh .glyph{width:42px;height:42px;border:2px solid var(--red);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--red);animation:pulse 1s infinite}
-  @keyframes pulse{50%{box-shadow:0 0 18px rgba(210,63,51,.6)}}
-  #hack .hh .ht{font-size:20px;letter-spacing:4px;color:var(--red);font-weight:bold} #hack .hh .hs{font-size:11px;letter-spacing:2px;color:var(--amber);margin-top:3px}
-  #hack .hlog{flex:1;overflow:hidden;font-size:12.5px;line-height:1.65;color:#7fe39a;white-space:pre-wrap;text-shadow:0 0 6px rgba(67,178,90,.3)}
-  #hack .hlog .hb{color:var(--blue)} #hack .hlog .hr{color:var(--red)} #hack .hlog .hd{color:#3a6b46} #hack .hlog .hg{color:var(--green)} #hack .hlog .hw{color:var(--amber)}
-  #hack .hbar-wrap{margin-top:14px} #hack .hbar-lbl{display:flex;justify-content:space-between;font-size:12px;color:var(--amber);margin-bottom:7px}
-  #hack .hbar{height:18px;background:#06090d;border:1px solid #1c3a25;border-radius:5px;overflow:hidden} #hack .hbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#1c5a30,#43b25a);transition:width .25s;box-shadow:0 0 12px rgba(67,178,90,.5)}
-  #hack .hdone{font-size:30px;letter-spacing:8px;color:var(--red);text-align:center;margin-top:10vh;display:none;animation:pulse .6s 3}
-
-  #glitch{position:fixed;inset:0;z-index:7000;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(210,63,51,.04),rgba(210,63,51,.04) 1px,transparent 2px,transparent 4px);opacity:0;transition:opacity .3s} #glitch.on{opacity:1;animation:flick .14s steps(2) 8} @keyframes flick{50%{opacity:.3}}
-
-  #toast-wrap{position:fixed;top:42px;right:18px;z-index:9500;display:flex;flex-direction:column;gap:8px}
-  .toast{background:var(--panel);border:1px solid var(--line2);border-left:3px solid var(--amber);border-radius:7px;padding:11px 15px;font-family:var(--mono);font-size:11.5px;color:var(--txt);box-shadow:0 10px 30px rgba(0,0,0,.5);min-width:230px;animation:slidein .25s} .toast.red{border-left-color:var(--red);color:#e8a59f} .toast.green{border-left-color:var(--green)}
-  @keyframes slidein{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}
+  @media(max-width:600px){.wrap{padding:18px 14px 50px}.topbar{padding:12px 16px}.brand .bn{font-size:16px}}
 </style>
 </head>
 <body>
 
-<div id="boot"><div class="seal-boot">▓ SECUREBOOT v4.7 — SAN ANDREAS GOV. CRYPTOGRAPHIC LOADER</div><div id="bootlines"></div></div>
-
-<div id="login">
-  <div class="login-seal"><svg viewBox="0 0 24 24" fill="none" stroke="#e0a93a" stroke-width="1.4"><path d="M12 2L3 6v6c0 5 3.8 8.5 9 10 5.2-1.5 9-5 9-10V6l-9-4z"/><path d="M12 7v5M9 9.5h6" stroke-width="1.2"/></svg></div>
-  <div class="login-cls">// CLASSIFIED — NIVEAU 4 //</div><div class="login-dept">Homeland Security</div><div class="login-sub">San Andreas — Division Cyberdéfense</div>
-  <div class="agent-card">
-    <div class="agent-row"><div class="agent-pfp">L</div><div><div class="agent-name">Agent L. LAZARO</div><div class="agent-id">BADGE · DHS-4471-SA</div></div></div>
-    <button class="auth-btn" id="authBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2L3 6v6c0 5 3.8 8.5 9 10 5.2-1.5 9-5 9-10V6l-9-4z"/><path d="M9 12l2 2 4-4"/></svg>SE CONNECTER</button>
-    <div class="auth-scan" id="authScan"></div>
+<div class="topbar">
+  <img class="logo" src="https://imgg.fr/r/94agnuhj.png" alt="Black Vulture" onerror="this.style.display='none'">
+  <div class="brand">
+    <div class="bn">BLACK <span>VULTURE</span></div>
+    <div class="bs">Inventaire · Stockages</div>
+  </div>
+  <div class="top-right">
+    <div class="sync-pill"><span class="dot" id="syncDot"></span><span id="syncTxt">Connexion…</span></div>
   </div>
 </div>
 
-<div id="desktop">
-  <svg class="bg-seal" viewBox="0 0 24 24" fill="none" stroke="#e0a93a" stroke-width="1"><path d="M12 2L3 6v6c0 5 3.8 8.5 9 10 5.2-1.5 9-5 9-10V6l-9-4z"/><path d="M12 7v5M9 9.5h6"/></svg>
-  <div class="bg-watermark">DEPARTMENT OF HOMELAND SECURITY · SA</div>
-  <div class="topbar">
-    <span class="cls-tag">// TOP SECRET //</span><span class="sep">|</span><span class="dept-tag">D.H.S. NET</span><span class="sep">|</span>
-    <span id="netStatus"><span class="stat-dot"></span>RÉSEAU SÉCURISÉ</span>
-    <div class="right"><span id="threatLevel"><span class="stat-dot"></span>MENACE : FAIBLE</span><span id="topClock">--:--:--</span></div>
-  </div>
-  <div class="icons" id="deskIcons"></div>
+<div class="wrap">
+  <div class="stats" id="stats"></div>
 
-  <div class="win" id="win-terminal" style="width:560px;height:400px;top:70px;left:200px">
-    <div class="win-bar" data-win="terminal"><span class="wtitle"><svg viewBox="0 0 24 24" fill="none" stroke="#e0a93a" stroke-width="1.5"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M6 8l4 4-4 4"/></svg>secure_shell — /root</span><div class="win-ctrls"><div class="wc min" data-min="terminal"></div><div class="wc max" data-max="terminal"></div><div class="wc close" data-close="terminal"></div></div></div>
-    <div class="win-body"><div class="term"><div class="out" id="termOut"></div><div class="term-input-row"><span class="term-prompt">root@dhs:~#</span><input class="term-input" id="termInput" autocomplete="off" spellcheck="false"></div></div></div>
-    <div class="win-resize" data-rz="terminal"></div>
+  <div class="toolbar">
+    <div class="search">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#9a978f" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+      <input id="searchInput" placeholder="Rechercher un objet ou un stockage…" autocomplete="off">
+    </div>
+    <div class="cats" id="cats"></div>
   </div>
 
-  <div class="win" id="win-notes" style="width:580px;height:440px;top:90px;left:260px">
-    <div class="win-bar" data-win="notes"><span class="wtitle"><svg viewBox="0 0 24 24" fill="none" stroke="#9fb0c0" stroke-width="1.5"><path d="M5 3h11l4 4v14a1 1 0 01-1 1H5a1 1 0 01-1-1V4a1 1 0 011-1z"/></svg>Notes</span><div class="win-ctrls"><div class="wc min" data-min="notes"></div><div class="wc max" data-max="notes"></div><div class="wc close" data-close="notes"></div></div></div>
-    <div class="win-body"><div class="notes-wrap"><div class="notes-list" id="notesList"></div><div class="notes-content" id="notesContent"></div></div></div>
-    <div class="win-resize" data-rz="notes"></div>
-  </div>
+  <div id="storages"></div>
 
-  <div class="win" id="win-files" style="width:660px;height:450px;top:80px;left:240px">
-    <div class="win-bar" data-win="files"><span class="wtitle"><svg viewBox="0 0 24 24" fill="none" stroke="#e0a93a" stroke-width="1.5"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>Explorateur de fichiers</span><div class="win-ctrls"><div class="wc min" data-min="files"></div><div class="wc max" data-max="files"></div><div class="wc close" data-close="files"></div></div></div>
-    <div class="win-body"><div class="files-wrap"><div class="files-side" id="filesSide"></div><div class="files-main"><div class="files-path"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#73808f" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg> <span id="pathTxt">Ce PC</span></div><div class="files-grid" id="filesGrid"></div></div></div></div>
-    <div class="win-resize" data-rz="files"></div>
-  </div>
+  <div class="feed-title">Activité récente</div>
+  <div class="feed" id="feed"></div>
 
-  <div class="win" id="win-doc" style="width:620px;height:480px;top:60px;left:280px">
-    <div class="win-bar" data-win="doc"><span class="wtitle"><svg viewBox="0 0 24 24" fill="none" stroke="#9fb0c0" stroke-width="1.5"><path d="M6 2h9l5 5v15H6V2z"/></svg><span id="docWinTitle">Document</span></span><div class="win-ctrls"><div class="wc min" data-min="doc"></div><div class="wc max" data-max="doc"></div><div class="wc close" data-close="doc"></div></div></div>
-    <div class="win-body"><div class="doc" id="docContent"></div></div>
-    <div class="win-resize" data-rz="doc"></div>
-  </div>
-
-  <div class="win" id="win-app" style="width:380px;height:440px;top:80px;left:320px">
-    <div class="win-bar" data-win="app"><span class="wtitle"><span id="appIcon"></span><span id="appWinTitle">Application</span></span><div class="win-ctrls"><div class="wc min" data-min="app"></div><div class="wc max" data-max="app"></div><div class="wc close" data-close="app"></div></div></div>
-    <div class="win-body"><div id="appInner"></div></div>
-    <div class="win-resize" data-rz="app"></div>
-  </div>
-
-  <div class="win" id="win-database" style="width:580px;height:500px;top:55px;left:300px">
-    <div class="win-bar" data-win="database"><span class="wtitle"><svg viewBox="0 0 24 24" fill="none" stroke="#d23f33" stroke-width="1.5"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v12c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/></svg>Base Centrale — Données Confidentielles</span><div class="win-ctrls"><div class="wc min" data-min="database"></div><div class="wc max" data-max="database"></div><div class="wc close" data-close="database"></div></div></div>
-    <div class="win-body"><div id="dbInner"></div></div>
-    <div class="win-resize" data-rz="database"></div>
-  </div>
-
-  <div class="taskbar">
-    <div class="start-btn" id="startBtn"><svg viewBox="0 0 24 24" fill="none" stroke="#e0a93a" stroke-width="1.4"><path d="M12 2L3 6v6c0 5 3.8 8.5 9 10 5.2-1.5 9-5 9-10V6l-9-4z"/></svg><span>DHS</span></div>
-    <div class="task-apps" id="taskApps"></div>
-    <div class="tray"><div class="sync-ind" title="État synchronisé entre les sessions"><span class="stat-dot"></span>SYNC</div><div class="usb-tray" id="usbTray" title="Périphérique USB"><svg viewBox="0 0 24 24" fill="none" stroke="#e0a93a" stroke-width="1.5"><rect x="9" y="2" width="6" height="13" rx="1"/><path d="M9 8h6M12 15v5M9 20h6"/></svg><span id="usbTrayTxt">USB</span></div><span class="clock" id="trayClock">--:--</span></div>
-  </div>
+  <div class="footer">BLACK VULTURE · données synchronisées en temps réel · rapport quotidien à minuit</div>
 </div>
-
-<div id="hack">
-  <div class="matrix" id="hackMatrix"></div><div class="scan"></div>
-  <div class="panel">
-    <div class="hh"><div class="glyph"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2L2 20h20L12 2z"/><path d="M12 9v5M12 17h.01"/></svg></div><div><div class="ht">DÉPLOIEMENT DU PAYLOAD</div><div class="hs">deploy.exe — exécution non signée · privilèges root</div></div></div>
-    <div class="hlog" id="hackLog"></div>
-    <div class="hbar-wrap"><div class="hbar-lbl"><span id="hackPhase">Initialisation…</span><span id="hackPct">0%</span></div><div class="hbar"><i id="hackBar"></i></div></div>
-    <div class="hdone" id="hackDone">▓ ACCÈS ROOT OBTENU ▓</div>
-  </div>
-</div>
-
-<div id="glitch"></div><div id="toast-wrap"></div>
 
 <script>
-/* ====== CONFIG ====== */
-const DB_CODE="7714", DL_TOTAL=2*3600, TURBO_KEY="F9", TURBO_MULT=180, SYNC_KEY="dhs_blackvault_v3";
+/* ====== CONFIG (même projet Supabase que le bot) ====== */
+const SUPABASE_URL = "https://fgzmbkomdbggfqforxzn.supabase.co";
+const SUPABASE_KEY = "sb_publishable_Y8LbGUHwi7PSnXhhOCLE4Q_9iu3WgVk";
+const LOW_STOCK = 3; // sous ce seuil, la quantité passe en rouge
 
-/* === SUPABASE (remplir avec tes valeurs du dashboard Supabase) ===
-   Ces valeurs sont publiques par design : l'anon key est protégée par RLS
-   (voir supabase-setup.sql). Ne JAMAIS coller la service_role key ici. */
-const SUPABASE_URL  = "https://fgzmbkomdbggfqforxzn.supabase.co";
-const SUPABASE_ANON = "sb_publishable_Y8LbGUHwi7PSnXhhOCLE4Q_9iu3WgVk";
-const ROOM_ID       = "default"; // un seul état partagé pour tout le monde
-
-/* === DISCORD WEBHOOK (notif des events RP)
-   ⚠ URL publique côté client. Si elle se fait spammer, regénère-la dans
-   Discord (Server Settings → Integrations → Webhooks) et recolle ici. */
-const DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1506338037741912064/yjKZmzE9COckt53C1QGb00aEa5Z63gjdr4zKYtypszoFGPSKxa7Ge5oJaJfZSXBROIw6";
+const CAT_META = {
+  "Armes":      {ic:'<svg viewBox="0 0 24 24" fill="none" stroke="#ffa040" stroke-width="1.6"><path d="M3 7h13l3 3v2h-2l-2-2H9l-2 4H4z"/><path d="M7 14v3"/></svg>'},
+  "Munitions":  {ic:'<svg viewBox="0 0 24 24" fill="none" stroke="#ffa040" stroke-width="1.6"><rect x="8" y="3" width="8" height="13" rx="3"/><path d="M9 16h6v4H9z"/></svg>'},
+  "Équipement": {ic:'<svg viewBox="0 0 24 24" fill="none" stroke="#ffa040" stroke-width="1.6"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/></svg>'},
+  "Drogues":    {ic:'<svg viewBox="0 0 24 24" fill="none" stroke="#ffa040" stroke-width="1.6"><path d="M10.5 3.5l10 10a5 5 0 01-7 7l-10-10a5 5 0 017-7z"/><path d="M8 8l8 8"/></svg>'},
+  "Argent":     {ic:'<svg viewBox="0 0 24 24" fill="none" stroke="#ffa040" stroke-width="1.6"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/></svg>'},
+  "Divers":     {ic:'<svg viewBox="0 0 24 24" fill="none" stroke="#ffa040" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>'},
+};
+function catIcon(c){return (CAT_META[c]||CAT_META["Divers"]).ic;}
+const cap = s => s ? s.charAt(0).toUpperCase()+s.slice(1) : s;
 
 /* ====== STATE ====== */
-let S=freshState();
-function freshState(){return{
-  usbInserted:true, payloadDeployed:false,
-  hack:{scan:false,inject:false,bypass:false,decrypt:false},
-  dbUnlocked:false, dbEntry:"",
-  dl:{active:false,accumulated:0,startedAt:0,rate:1,completed:false},
-  needUsbRemoval:false
-};}
-let curThreat={lvl:"FAIBLE",cls:""};
+let ITEMS = [];          // [{storage,item,category,qty}]
+let TX = [];             // transactions du jour (pour badges + feed)
+let activeCat = "Toutes";
+let search = "";
+const collapsed = new Set();
 
-/* ====== SYNC (multi-fenêtres / multi-NUI même machine) ====== */
-let lastRev=0, applyingRemote=false;
-function snapshot(){return{
-  usbInserted:S.usbInserted,payloadDeployed:S.payloadDeployed,hack:{...S.hack},dbUnlocked:S.dbUnlocked,
-  dl:{active:S.dl.active,accumulated:S.dl.accumulated,startedAt:S.dl.startedAt,rate:S.dl.rate,completed:S.dl.completed},
-  needUsbRemoval:S.needUsbRemoval,threat:curThreat,rev:Date.now()
-};}
-function persist(){
-  if(applyingRemote)return;
-  try{const s=snapshot();lastRev=s.rev;localStorage.setItem(SYNC_KEY,JSON.stringify(s));}catch(e){}
-  pushRemote();
-}
-function applyRemote(o,initial){
-  if(!o)return; if(!initial && (!o.rev || o.rev<=lastRev))return;
-  applyingRemote=true; lastRev=o.rev||0;
-  S.usbInserted=o.usbInserted; S.payloadDeployed=o.payloadDeployed; S.hack=o.hack||S.hack;
-  S.dbUnlocked=o.dbUnlocked; S.needUsbRemoval=o.needUsbRemoval;
-  if(o.dl){S.dl.active=o.dl.active;S.dl.accumulated=o.dl.accumulated;S.dl.startedAt=o.dl.startedAt;S.dl.rate=o.dl.rate;S.dl.completed=o.dl.completed;}
-  if(o.threat)curThreat=o.threat;
-  syncUI();
-  applyingRemote=false;
-}
-window.addEventListener("storage",e=>{if(e.key===SYNC_KEY&&e.newValue){try{applyRemote(JSON.parse(e.newValue));}catch(_){}}});
-
-/* ====== SUPABASE BRIDGE (synchro entre PC via Vercel + Supabase) ====== */
-let sb=null, sbReady=false, pushTimer=null, pendingPush=false;
+/* ====== SUPABASE ====== */
+let sb=null;
 function sbInit(){
-  if(sb || !window.supabase){ console.log("[sync] init skipped",{hasClient:!!sb,hasLib:!!window.supabase}); return; }
-  if(!SUPABASE_URL || SUPABASE_URL.includes("YOUR-PROJECT-REF")){ console.warn("[sync] SUPABASE_URL placeholder, abort"); return; }
-  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
-    realtime:{ params:{ eventsPerSecond: 10 } }
-  });
-  sbReady=true;
-  console.log("[sync] client ready ->", SUPABASE_URL);
+  if(!window.supabase || SUPABASE_URL.includes("YOUR-")) { setSync(false); return; }
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { realtime:{ params:{ eventsPerSecond:10 } } });
 }
-async function sbFetchInitial(){
-  if(!sbReady) return;
+function setSync(live){
+  const d=document.getElementById("syncDot"), t=document.getElementById("syncTxt");
+  d.className = "dot " + (live?"live":"off");
+  t.textContent = live ? "En direct" : "Hors ligne";
+}
+function parisDay(d=new Date()){ return new Intl.DateTimeFormat("fr-CA",{timeZone:"Europe/Paris"}).format(d); }
+
+async function loadAll(){
+  if(!sb) return;
   try{
-    const { data, error } = await sb.from("dhs_state").select("state").eq("room", ROOM_ID).maybeSingle();
-    if(error){ console.warn("[sync] fetch initial failed",error); return; }
-    console.log("[sync] fetch initial OK, has state:", !!(data&&data.state));
-    if(data && data.state) applyRemote(data.state, true);
-  }catch(e){ console.warn("[sync] fetch threw",e); }
-}
-function sbSubscribe(){
-  if(!sbReady) return;
-  sb.channel("dhs_state_"+ROOM_ID)
-    .on("postgres_changes",
-        { event:"*", schema:"public", table:"dhs_state", filter:"room=eq."+ROOM_ID },
-        payload => {
-          console.log("[sync] <- remote change", payload.eventType, payload.new && Object.keys(payload.new.state||{}).length, "keys");
-          const row = payload.new || payload.record;
-          if(row && row.state) applyRemote(row.state);
-        })
-    .subscribe(status => console.log("[sync] channel status:", status));
-}
-function pushRemote(){
-  if(!sbReady || applyingRemote) return;
-  pendingPush=true;
-  if(pushTimer) return;
-  pushTimer = setTimeout(async ()=>{
-    pushTimer=null;
-    if(!pendingPush) return;
-    pendingPush=false;
-    try{
-      const s = snapshot();
-      const { error } = await sb.from("dhs_state").upsert({ room: ROOM_ID, state: s, updated_at: new Date().toISOString() }, { onConflict:"room" });
-      if(error) console.warn("[sync] push error",error);
-      else console.log("[sync] -> pushed rev",s.rev);
-    }catch(e){ console.warn("[sync] push threw",e); }
-  }, 250);
+    const [{data:items,error:e1},{data:tx,error:e2}] = await Promise.all([
+      sb.from("bv_items").select("*").gt("qty",0),
+      sb.from("bv_transactions").select("*").eq("day",parisDay()).order("ts",{ascending:false})
+    ]);
+    if(e1||e2){ console.warn("[bv] load error",e1||e2); setSync(false); return; }
+    ITEMS = items||[]; TX = tx||[];
+    setSync(true);
+    render();
+  }catch(err){ console.warn("[bv] load threw",err); setSync(false); }
 }
 
-/* ====== DISCORD WEBHOOK (embed notifs RP) ====== */
-const NOTIFY_COLORS = { ok:0x43b25a, info:0xe0a93a, warn:0xe0a93a, alert:0xd23f33, blue:0x3d7dd6 };
-let _notifQueue=[], _notifBusy=false;
-function discordNotify(title, description, type, extra){
-  if(!DISCORD_WEBHOOK || DISCORD_WEBHOOK.includes("YOUR_WEBHOOK")) return;
-  if(applyingRemote) return; // n'envoie que pour les actions LOCALES, pas pour les echo realtime
-  _notifQueue.push({title, description, type, extra});
-  _drainNotif();
-}
-async function _drainNotif(){
-  if(_notifBusy || !_notifQueue.length) return;
-  _notifBusy=true;
-  const { title, description, type, extra } = _notifQueue.shift();
-  const body = {
-    username: "D.H.S. — San Andreas Terminal",
-    embeds: [{
-      title: title || "Évènement",
-      description: description || "",
-      color: NOTIFY_COLORS[type] ?? NOTIFY_COLORS.info,
-      timestamp: new Date().toISOString(),
-      footer: { text: "Agent L. LAZARO · DHS-4471-SA" },
-      ...(extra || {})
-    }]
-  };
-  try{
-    await fetch(DISCORD_WEBHOOK, {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify(body)
-    });
-  }catch(e){ console.warn("[discord] notify failed", e); }
-  setTimeout(()=>{ _notifBusy=false; _drainNotif(); }, 600); // anti rate-limit
+function subscribe(){
+  if(!sb) return;
+  sb.channel("bv_live")
+    .on("postgres_changes",{event:"*",schema:"public",table:"bv_items"},     ()=>loadAll())
+    .on("postgres_changes",{event:"*",schema:"public",table:"bv_transactions"},()=>loadAll())
+    .subscribe(st=>{ console.log("[bv] channel:",st); if(st==="SUBSCRIBED") setSync(true); });
 }
 
-function syncUI(){
-  const live=document.getElementById("desktop").style.display==="flex"; if(!live)return;
-  usbTray.classList.toggle("gone",!S.usbInserted);
-  usbTray.classList.toggle("pulse",S.needUsbRemoval&&S.usbInserted);
-  document.getElementById("usbTrayTxt").textContent=S.usbInserted?(S.needUsbRemoval?"Retirer USB":"USB"):"USB retirée";
-  threatRender();
-  renderFiles(); renderDatabase();
-  if(S.dl.active && !dlInterval) runDlTick();
-  if(!S.dl.active && dlInterval){clearInterval(dlInterval);dlInterval=null;}
-  refreshDlView();
+/* ====== RENDER ====== */
+function dayDelta(storage,item){
+  return TX.filter(t=>t.storage===storage && t.item===item).reduce((a,t)=>a+t.delta,0);
 }
-
-/* ====== BOOT ====== */
-const bootSeq=[["Initialisation du chargeur cryptographique...","ok"],["Vérification de l'intégrité du noyau ............ [OK]","ok"],["Montage des volumes chiffrés (AES-256) .......... [OK]","ok"],["Synchronisation de l'état poste (multi-session) . [OK]","ok"],["Établissement du tunnel D.H.S.-NET .............. [OK]","ok"],["Scan des périphériques connectés ................",""],["  > Disque Système (C:) ......................... détecté","dim"],["  > Archives Sécurisées (S:) ................... détecté","dim"],["  > Périphérique USB inconnu (E:) .............. détecté","warn"],["AVERTISSEMENT : périphérique externe non certifié","warn"],["Session prête.","ok"]];
-const bootEl=document.getElementById("bootlines");let bi=0;
-function runBoot(){document.querySelector(".seal-boot").style.opacity=1;
-  function step(){if(bi>=bootSeq.length){setTimeout(()=>{document.getElementById("boot").style.display="none";document.getElementById("login").style.display="flex";},500);return;}
-    const[txt,cls]=bootSeq[bi];const d=document.createElement("div");d.className="bline"+(cls==="ok"?" ok":cls==="warn"?" warn":"");d.textContent=txt;if(cls==="dim")d.style.color="#46505d";bootEl.appendChild(d);
-    requestAnimationFrame(()=>{d.style.transition="opacity .3s";d.style.opacity=1;});bi++;setTimeout(step,200+Math.random()*160);}
-  setTimeout(step,400);}
-runBoot();
-
-/* ====== LOGIN ====== */
-document.getElementById("authBtn").onclick=()=>{
-  const scan=document.getElementById("authScan"),btn=document.getElementById("authBtn");btn.disabled=true;btn.style.opacity=.6;
-  const seq=["Lecture du badge DHS-4471-SA…","Vérification biométrique…","Habilitation niveau 4 confirmée."];let i=0;scan.style.color="#73808f";
-  const iv=setInterval(()=>{scan.textContent=seq[i];if(i===seq.length-1)scan.style.color="#43b25a";i++;if(i>=seq.length){clearInterval(iv);setTimeout(()=>{document.getElementById("login").style.display="none";startDesktop();},650);}},550);
-};
-
-/* ====== DESKTOP ====== */
-function startDesktop(){
-  document.getElementById("desktop").style.display="flex";
-  renderDeskIcons();initTerminal();renderNotes();
-  try{const v=localStorage.getItem(SYNC_KEY);if(v)applyRemote(JSON.parse(v),true);}catch(e){}
-  sbInit(); sbFetchInitial().then(sbSubscribe);
-  renderFiles();renderDatabase();threatRender();
-  if(S.dl.active)runDlTick();
-  tickClock();setInterval(tickClock,1000);
-  toast("Session ouverte — état synchronisé","green");
-  discordNotify("🟢 Connexion agent","Agent **L. LAZARO** (DHS-4471-SA) a ouvert une session sur le poste sécurisé.","ok");
+function categories(){
+  const counts={};
+  ITEMS.forEach(i=>{counts[i.category]=(counts[i.category]||0)+1;});
+  return counts;
 }
-function tickClock(){const d=new Date(),p=n=>String(n).padStart(2,"0");
-  document.getElementById("topClock").textContent=`${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-  document.getElementById("trayClock").textContent=`${p(d.getHours())}:${p(d.getMinutes())}`;
-  const ce=document.getElementById("clockBig");if(ce)ce.textContent=`${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-}
-
-/* ====== ICONS ====== */
-const DESK_ICONS=[
-  {app:"terminal",label:"Terminal",ic:'<svg viewBox="0 0 24 24" fill="none" stroke="#e0a93a" stroke-width="1.5"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M6 8l4 4-4 4M13 16h5"/></svg>'},
-  {app:"notes",label:"Notes",ic:'<svg viewBox="0 0 24 24" fill="none" stroke="#9fb0c0" stroke-width="1.5"><path d="M5 3h11l4 4v14a1 1 0 01-1 1H5a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M16 3v4h4M8 12h8M8 16h6"/></svg>'},
-  {app:"files",label:"Fichiers",ic:'<svg viewBox="0 0 24 24" fill="none" stroke="#e0a93a" stroke-width="1.5"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>'},
-  {app:"database",label:"Base Centrale",ic:'<svg viewBox="0 0 24 24" fill="none" stroke="#d23f33" stroke-width="1.5"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>'},
-  {junk:"calc",label:"Calculatrice",ic:'<svg viewBox="0 0 24 24" fill="none" stroke="#9fb0c0" stroke-width="1.5"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 11h2M14 11h2M8 15h2M14 15h2"/></svg>'},
-  {junk:"clock",label:"Horloge",ic:'<svg viewBox="0 0 24 24" fill="none" stroke="#9fb0c0" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'},
-  {junk:"pad",label:"Bloc-notes",ic:'<svg viewBox="0 0 24 24" fill="none" stroke="#9fb0c0" stroke-width="1.5"><path d="M4 3h16v18H4z"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>'},
-  {junk:"gallery",label:"Galerie",ic:'<svg viewBox="0 0 24 24" fill="none" stroke="#9fb0c0" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 16l-5-5L5 20"/></svg>'},
-];
-function renderDeskIcons(){const c=document.getElementById("deskIcons");c.innerHTML="";DESK_ICONS.forEach(d=>{const el=document.createElement("div");el.className="dicon";el.innerHTML=`<div class="ic">${d.ic}</div><div class="lbl">${d.label}</div>`;el.onclick=()=>d.app?openWin(d.app):openJunk(d.junk);c.appendChild(el);});}
-
-/* ====== WINDOW MANAGER ====== */
-let zTop=100;const openWins=new Set();
-function openWin(id){const w=document.getElementById("win-"+id);w.classList.add("open");focusWin(id);openWins.add(id);renderTaskbar();if(id==="terminal")setTimeout(()=>document.getElementById("termInput").focus(),50);}
-function closeWin(id){document.getElementById("win-"+id).classList.remove("open");openWins.delete(id);renderTaskbar();}
-function focusWin(id){zTop++;document.getElementById("win-"+id).style.zIndex=zTop;document.querySelectorAll(".task-app").forEach(t=>t.classList.toggle("active",t.dataset.taskapp===id));}
-const WIN_NAMES={terminal:"Terminal",notes:"Notes",files:"Fichiers",doc:"Document",app:"Application",database:"Base Centrale"};
-function renderTaskbar(){const ta=document.getElementById("taskApps");ta.innerHTML="";openWins.forEach(id=>{const el=document.createElement("div");el.className="task-app";el.dataset.taskapp=id;el.textContent=id==="app"?document.getElementById("appWinTitle").textContent:(WIN_NAMES[id]||id);el.onclick=()=>{document.getElementById("win-"+id).classList.add("open");focusWin(id);};ta.appendChild(el);});}
-const winPrev={};
-function toggleMax(id){const w=document.getElementById("win-"+id);if(w.classList.contains("maxed")){w.classList.remove("maxed");const p=winPrev[id];if(p){w.style.left=p.l;w.style.top=p.t;w.style.width=p.w;w.style.height=p.h;}}else{winPrev[id]={l:w.style.left,t:w.style.top,w:w.style.width,h:w.style.height};w.classList.add("maxed");w.style.left="0px";w.style.top="31px";w.style.width="100vw";w.style.height="calc(100vh - 81px)";}}
-document.querySelectorAll("[data-close]").forEach(b=>b.onclick=e=>{e.stopPropagation();closeWin(b.dataset.close);});
-document.querySelectorAll("[data-min]").forEach(b=>b.onclick=e=>{e.stopPropagation();closeWin(b.dataset.min);});
-document.querySelectorAll("[data-max]").forEach(b=>b.onclick=e=>{e.stopPropagation();toggleMax(b.dataset.max);});
-document.querySelectorAll(".win").forEach(w=>w.addEventListener("mousedown",()=>focusWin(w.id.replace("win-",""))));
-document.querySelectorAll(".win-bar").forEach(bar=>bar.addEventListener("dblclick",e=>{if(!e.target.closest(".wc"))toggleMax(bar.dataset.win);}));
-document.querySelectorAll(".win-bar").forEach(bar=>bar.addEventListener("mousedown",e=>{if(e.target.closest(".wc"))return;const win=bar.parentElement;if(win.classList.contains("maxed"))return;const r=win.getBoundingClientRect(),ox=e.clientX-r.left,oy=e.clientY-r.top;function mv(ev){let x=Math.max(0,Math.min(ev.clientX-ox,window.innerWidth-80)),y=Math.max(31,Math.min(ev.clientY-oy,window.innerHeight-90));win.style.left=x+"px";win.style.top=y+"px";}function up(){document.removeEventListener("mousemove",mv);document.removeEventListener("mouseup",up);}document.addEventListener("mousemove",mv);document.addEventListener("mouseup",up);}));
-document.querySelectorAll(".win-resize").forEach(h=>h.addEventListener("mousedown",e=>{e.preventDefault();e.stopPropagation();const win=document.getElementById("win-"+h.dataset.rz);win.classList.remove("maxed");const r=win.getBoundingClientRect(),sx=e.clientX,sy=e.clientY,sw=r.width,sh=r.height;function mv(ev){win.style.width=Math.max(320,sw+ev.clientX-sx)+"px";win.style.height=Math.max(220,sh+ev.clientY-sy)+"px";}function up(){document.removeEventListener("mousemove",mv);document.removeEventListener("mouseup",up);}document.addEventListener("mousemove",mv);document.addEventListener("mouseup",up);}));
-document.getElementById("startBtn").onclick=()=>toast("Menu D.H.S. — accès restreint");
-
-/* ====== TERMINAL ====== */
-const termOut=document.getElementById("termOut"),termInput=document.getElementById("termInput");
-function tscroll(){const b=termOut.parentElement.parentElement;b.scrollTop=b.scrollHeight;}
-function tprint(t,c){const d=document.createElement("div");d.className="out"+(c?" ln-"+c:"");d.textContent=t;termOut.appendChild(d);tscroll();}
-function tprintHTML(h){const d=document.createElement("div");d.className="out";d.innerHTML=h;termOut.appendChild(d);tscroll();}
-function initTerminal(){termOut.innerHTML="";tprint("D.H.S. SECURE SHELL v4.7  —  noyau durci","amber");tprint("Connexion : root@dhs (niveau 4)","dim");tprint('Tapez "help" pour la liste des commandes.',"dim");tprint("");}
-function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
-async function typeOut(lines){for(const[t,c,d]of lines){await sleep(d||180);tprint(t,c);}}
-termInput.addEventListener("keydown",async e=>{if(e.key!=="Enter")return;const raw=termInput.value.trim();if(!raw)return;tprint("root@dhs:~# "+raw,"dim");termInput.value="";await handleCmd(raw.toLowerCase());});
-async function handleCmd(cmd){const c=cmd.split(/\s+/)[0];switch(c){
-  case "help":tprint("Commandes disponibles :","amber");tprint("  help            cette aide");tprint("  status          état du système et de l'intrusion");tprint("  devices         périphériques connectés");tprint("  scan            cartographie la Base Centrale");tprint("  inject          injecte le payload via la clé USB");tprint("  bypass          contourne le pare-feu D.H.S.");tprint("  decrypt         déchiffre le code d'accès");tprint("  clear           nettoie le terminal");tprint("");tprint("Procédure complète : voir readme.txt sur la clé USB (E:).","dim");break;
-  case "clear":termOut.innerHTML="";break;
-  case "status":tprint("── ÉTAT DU SYSTÈME ──────────────","amber");tprint("  Payload USB   : "+(S.payloadDeployed?"DÉPLOYÉ":"non déployé"),S.payloadDeployed?"green":"red");tprint("  Scan réseau   : "+(S.hack.scan?"FAIT":"en attente"),S.hack.scan?"green":"dim");tprint("  Injection     : "+(S.hack.inject?"FAIT":"en attente"),S.hack.inject?"green":"dim");tprint("  Bypass FW     : "+(S.hack.bypass?"FAIT":"en attente"),S.hack.bypass?"green":"dim");tprint("  Déchiffrement : "+(S.hack.decrypt?"FAIT":"en attente"),S.hack.decrypt?"green":"dim");tprint("  Base Centrale : "+(S.dbUnlocked?"DÉVERROUILLÉE":"VERROUILLÉE"),S.dbUnlocked?"green":"red");break;
-  case "devices":tprint("Périphériques montés :","amber");tprint("  /dev/sda1   Disque Système (C:)        480 Go");tprint("  /dev/sdb1   Archives Sécurisées (S:)   2 To");if(S.usbInserted)tprint("  /dev/sdc1   USB EXTERNE (E:)  [NON CERTIFIÉ]","red");else tprint("  (clé USB retirée)","dim");break;
-  case "scan":if(!S.payloadDeployed){tprint("ERREUR : aucun payload actif. Exécutez deploy.exe depuis la clé USB.","red");break;}await typeOut([["[*] Cartographie du sous-réseau 10.84.0.0/16 ...","blue",250],["    > passerelle 10.84.0.1 ............... vivante","dim",350],["    > noeud base-centrale.dhs.sa ......... vivant","dim",350],["[+] Scan terminé. Cible : base-centrale.dhs.sa","green",250]]);S.hack.scan=true;threat("MODÉRÉE","warn");persist();discordNotify("📡 SCAN réussi","Sous-réseau 10.84.0.0/16 cartographié. Cible : `base-centrale.dhs.sa`.","info");break;
-  case "inject":if(!S.payloadDeployed){tprint("ERREUR : payload absent. Exécutez deploy.exe.","red");break;}if(!S.hack.scan){tprint("ERREUR : lancez 'scan' d'abord.","red");break;}await typeOut([["[*] Injection du payload via /dev/sdc1 ...","blue",250],["    uploading shellcode .............. 76%","dim",350],["    uploading shellcode ............. 100%","dim",350],["[+] Implant actif sur le noeud distant.","green",250]]);S.hack.inject=true;persist();discordNotify("💉 INJECT réussi","Implant actif sur le noeud distant via `/dev/sdc1`.","warn");break;
-  case "bypass":if(!S.hack.inject){tprint("ERREUR : aucun implant actif. Lancez 'inject'.","red");break;}await typeOut([["[*] Analyse du pare-feu D.H.S. ...","blue",250],["    règle 0x1A ... contournée","dim",300],["    handshake TLS forgé ... accepté","dim",340],["[+] Pare-feu contourné. Tunnel ouvert.","green",250]]);S.hack.bypass=true;threat("ÉLEVÉE","bad");persist();discordNotify("🛡 BYPASS réussi","Pare-feu D.H.S. contourné. Tunnel ouvert vers la cible.","alert");break;
-  case "decrypt":if(!S.hack.bypass){tprint("ERREUR : pare-feu actif. Lancez 'bypass'.","red");break;}await typeOut([["[*] Extraction du hash du code d'accès ...","blue",250],["    SHA-256 capturé : 4f7a...e91c","dim",320],["[*] Attaque par dictionnaire ...","blue",350],["    tentatives : 9571 ...","dim",350],["[+] COLLISION TROUVÉE.","green",300]]);S.hack.decrypt=true;persist();tprint("");tprintHTML('<span class="ln-amber">╔══════════════════════════════════╗</span>');tprintHTML('<span class="ln-amber">║  CODE D\'ACCÈS BASE CENTRALE : </span><span class="ln-green" style="font-size:15px;font-weight:bold">'+DB_CODE+'</span><span class="ln-amber">  ║</span>');tprintHTML('<span class="ln-amber">╚══════════════════════════════════╝</span>');tprint("");tprint("→ Ouvrez « Base Centrale » et entrez ce code.","dim");toast("Code déchiffré : "+DB_CODE,"green");discordNotify("🔑 DECRYPT réussi","Code à 4 chiffres extrait par collision. Accès Base Centrale prêt.","alert");break;
-  case "reset":await typeOut([["[!] Effacement des traces ...","red",200],["    purge des logs ............ done","dim",250],["    restauration de l'état initial ...","dim",250]]);doReset();tprint("[+] Système réinitialisé. Toutes traces supprimées.","green");break;
-  default:tprint("commande inconnue : "+c+'  (tapez "help")',"red");}}
-function threat(lvl,cls){curThreat={lvl,cls};threatRender();}
-function threatRender(){const el=document.getElementById("threatLevel");if(el)el.innerHTML='<span class="stat-dot '+(curThreat.cls==="bad"?"bad":curThreat.cls==="warn"?"warn":"")+'"></span>MENACE : '+curThreat.lvl;}
-
-/* ====== NOTES ====== */
-const NOTES=[
-  {id:"n0",t:"⚑ OP. BLACKVAULT",d:"agent_lazaro",body:`<h3>⚑ OPÉRATION « BLACKVAULT »</h3><p>Objectif : exfiltrer les <b>données confidentielles</b> de la Base Centrale avant la rotation des clés (00:00).</p><p>⚠ Toute la marche à suivre détaillée est sur la <b>clé USB (E:) › readme.txt</b>. Lis-la avant de commencer.</p><div class="warn-note">⚠ Efface les traces une fois fini, et RETIRE la clé USB à la fin.</div>`},
-  {id:"n2",t:"☎ Contacts (chiffrés)",d:"répertoire",body:`<h3>☎ RÉPERTOIRE OPÉRATIONNEL</h3><p>Liaison « VAULT » ......... +1 (555) ███-██41</p><p>Extraction Sandy Shores ... canal 7</p><p>Point de chute ............ entrepôt B, docks de Los Santos</p>`},
-  {id:"n3",t:"✎ Mémo perso",d:"brouillon",body:`<h3>✎ MÉMO</h3><p>- Rapporter les badges visiteurs au poste 4.</p><p>- Réunion débrief 14h salle ops.</p><p>- Ne PAS laisser la clé E: branchée sur un poste relié au réseau.</p>`},
-];
-function renderNotes(){const list=document.getElementById("notesList");list.innerHTML="";NOTES.forEach((n,i)=>{const el=document.createElement("div");el.className="note-item"+(i===0?" active":"");el.innerHTML=`<div class="nt">${n.t}</div><div class="nd">${n.d}</div>`;el.onclick=()=>{document.querySelectorAll(".note-item").forEach(x=>x.classList.remove("active"));el.classList.add("active");document.getElementById("notesContent").innerHTML=n.body;};list.appendChild(el);});document.getElementById("notesContent").innerHTML=NOTES[0].body;}
-
-/* ====== FILES ====== */
-const DRIVES={
-  C:{label:"Disque Système (C:)",meta:"480 Go · 312 Go libres",used:35,icon:"hdd",items:[{type:"folder",name:"Système",to:"C_sys"},{type:"folder",name:"Documents Internes",to:"C_docs"},{type:"app",name:"Terminal",app:"terminal"},{type:"app",name:"Notes",app:"notes"},{type:"junk",name:"Calculatrice",junk:"calc"},{type:"junk",name:"Bloc-notes",junk:"pad"},{type:"doc",name:"note_agent.txt",doc:"agentnote",sz:"2 Ko"}]},
-  S:{label:"Archives Sécurisées (S:)",meta:"2 To · 1.4 To libres",used:30,icon:"hdd",items:[{type:"folder",name:"Dossiers Confidentiels",to:"S_conf"},{type:"folder",name:"Agents Infiltrés",to:"S_inf"},{type:"folder",name:"Surveillance",to:"S_surv"},{type:"folder",name:"Rapports Divers",to:"S_misc"},{type:"app",name:"Base Centrale",app:"database"}]},
-  E:{label:"USB EXTERNE (E:)",meta:"16 Go · NON CERTIFIÉ",used:88,icon:"usb",usb:true,items:[{type:"virus",name:"deploy.exe",sz:"4.2 Mo"},{type:"doc",name:"readme.txt",doc:"usbreadme",sz:"3 Ko"},{type:"sysfile",name:"payload.bin",sz:"4.0 Mo"}]},
-};
-const FOLDERS={
-  C_sys:{path:"C: › Système",items:[{type:"sysfile",name:"kernel.sys",sz:"8 Mo"},{type:"sysfile",name:"boot.cfg",sz:"4 Ko"},{type:"sysfile",name:"crypto.dll",sz:"1.2 Mo"},{type:"sysfile",name:"hal.sys",sz:"640 Ko"}]},
-  C_docs:{path:"C: › Documents Internes",items:[{type:"doc",name:"directive_4471.pdf",doc:"directive",sz:"320 Ko"},{type:"doc",name:"badge_acces.pdf",doc:"badge",sz:"180 Ko"},{type:"doc",name:"horaires_equipe.txt",doc:"horaires",sz:"3 Ko"},{type:"doc",name:"cafeteria_menu.txt",doc:"menu",sz:"2 Ko"}]},
-  S_conf:{path:"S: › Dossiers Confidentiels",items:[{type:"doc",name:"DOSSIER_OMEGA.pdf",doc:"omega",sz:"1.1 Mo",cls:true},{type:"doc",name:"liste_surveillance.pdf",doc:"watchlist",sz:"640 Ko",cls:true},{type:"doc",name:"op_blackvault.pdf",doc:"blackvault",sz:"880 Ko",cls:true}]},
-  S_inf:{path:"S: › Agents Infiltrés",items:[
-    {type:"doc",name:"REGISTRE_AGENTS_INF.pdf",doc:"agents_index",sz:"1.4 Mo",cls:true},
-    {type:"doc",name:"dossier_CORBEAU.pdf",doc:"agent_corbeau",sz:"720 Ko",cls:true},
-    {type:"doc",name:"dossier_VEINE.pdf",doc:"agent_veine",sz:"680 Ko",cls:true},
-    {type:"doc",name:"dossier_ECHO-7.pdf",doc:"agent_echo7",sz:"510 Ko",cls:true},
-    {type:"doc",name:"dossier_NEON.pdf",doc:"agent_neon",sz:"700 Ko",cls:true},
-    {type:"doc",name:"dossier_OURS.pdf",doc:"agent_ours",sz:"640 Ko",cls:true},
-    {type:"doc",name:"dossier_██████.pdf",doc:"agent_redacted",sz:"— Ko",cls:true},
-    {type:"doc",name:"protocole_extraction.pdf",doc:"protocole_extraction",sz:"310 Ko",cls:true},
-    {type:"doc",name:"officiers_traitants.txt",doc:"liaison_handlers",sz:"6 Ko",cls:true},
-    {type:"doc",name:"note_taupes.txt",doc:"note_taupes",sz:"4 Ko"}
-  ]},
-  S_surv:{path:"S: › Surveillance",items:[{type:"doc",name:"rapport_LS_0412.pdf",doc:"surv1",sz:"420 Ko",cls:true},{type:"doc",name:"interceptions.pdf",doc:"surv2",sz:"510 Ko",cls:true},{type:"junk",name:"Galerie surveillance",junk:"gallery"}]},
-  S_misc:{path:"S: › Rapports Divers",items:[{type:"doc",name:"note_de_frais.txt",doc:"frais",sz:"1 Ko"},{type:"doc",name:"inventaire_materiel.txt",doc:"invent",sz:"2 Ko"},{type:"doc",name:"vieux_memo.txt",doc:"vieuxmemo",sz:"1 Ko"}]},
-};
-let curDrive="C",curFolder=null;
-function renderFiles(){const side=document.getElementById("filesSide");if(!side)return;side.innerHTML='<div class="sg">Ce PC</div>';for(const k in DRIVES){const d=DRIVES[k];const el=document.createElement("div");el.className="drive"+(k===curDrive&&!curFolder?" active":"")+(d.usb?" usb-drive":"")+(d.usb&&!S.usbInserted?" removed":"");el.innerHTML=`${driveIcon(d.icon)}<div style="flex:1"><div>${d.label}</div><div class="dmeta">${d.usb&&!S.usbInserted?"déconnecté":d.meta}</div><div class="drive-bar"><i style="width:${d.used}%"></i></div></div>`;if(!(d.usb&&!S.usbInserted))el.onclick=()=>{curDrive=k;curFolder=null;renderFiles();};side.appendChild(el);}renderGrid();}
-function driveIcon(t){return t==="usb"?'<svg viewBox="0 0 24 24" fill="none" stroke="#e0a93a" stroke-width="1.5"><rect x="9" y="2" width="6" height="13" rx="1"/><path d="M9 8h6M12 15v5M9 20h6"/></svg>':'<svg viewBox="0 0 24 24" fill="none" stroke="#73808f" stroke-width="1.5"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="17" cy="12" r="1.4" fill="#73808f"/></svg>';}
-function renderGrid(){const grid=document.getElementById("filesGrid");if(!grid)return;grid.innerHTML="";let items,pathLabel;if(curFolder&&FOLDERS[curFolder]){items=FOLDERS[curFolder].items;pathLabel=FOLDERS[curFolder].path;const back=document.createElement("div");back.className="fitem";back.innerHTML=`${fIcon("back")}<div class="fl">..</div>`;back.onclick=()=>{curFolder=null;renderFiles();};grid.appendChild(back);}else{if(!DRIVES[curDrive]){curDrive="C";}items=DRIVES[curDrive].items;pathLabel=DRIVES[curDrive].label;}document.getElementById("pathTxt").textContent=pathLabel;items.forEach(it=>{const el=document.createElement("div");el.className="fitem"+(it.cls?" locked":"");el.innerHTML=`${fIcon(it.type)}<div class="fl">${it.name}</div>${it.sz?`<div class="fsz">${it.sz}</div>`:""}`;el.onclick=()=>handleFile(it);grid.appendChild(el);});}
-function fIcon(t){const ic={folder:'<svg viewBox="0 0 24 24" fill="none" stroke="#e0a93a" stroke-width="1.4"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>',back:'<svg viewBox="0 0 24 24" fill="none" stroke="#73808f" stroke-width="1.4"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/><path d="M14 10l-3 2 3 2"/></svg>',doc:'<svg viewBox="0 0 24 24" fill="none" stroke="#9fb0c0" stroke-width="1.4"><path d="M6 2h9l5 5v15H6V2z"/><path d="M15 2v5h5M9 13h6M9 17h4"/></svg>',sysfile:'<svg viewBox="0 0 24 24" fill="none" stroke="#6b7684" stroke-width="1.4"><path d="M6 2h12v20H6z"/><path d="M9 7h6M9 11h6M9 15h3"/></svg>',app:'<svg viewBox="0 0 24 24" fill="none" stroke="#e0a93a" stroke-width="1.4"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>',junk:'<svg viewBox="0 0 24 24" fill="none" stroke="#9fb0c0" stroke-width="1.4"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h6v6H9z"/></svg>',virus:'<svg viewBox="0 0 24 24" fill="none" stroke="#d23f33" stroke-width="1.4"><circle cx="12" cy="12" r="5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>'};return ic[t]||ic.doc;}
-function handleFile(it){if(it.type==="folder"){curFolder=it.to;renderFiles();}else if(it.type==="app"){openWin(it.app);}else if(it.type==="junk"){openJunk(it.junk);}else if(it.type==="doc"){openDoc(it.doc);}else if(it.type==="virus"){runVirus();}else if(it.type==="sysfile"){toast("Fichier système protégé — accès refusé","red");}}
-
-/* ====== VIRUS ====== */
-const hackScript=[["[init] lecture de deploy.exe depuis E:\\","hw"],["[init] vérification de signature ... ABSENTE","hr"],["[!] exécution forcée par l'opérateur — bypass UAC","hr"],["[*] désassemblage du binaire ... 0x4012f0","hd"],["[*] allocation mémoire RWX @ 0x7ffd0000","hd"],["[*] décryptage de la charge utile (XOR rolling) ...",""],["    block 0x00 .. 0x40 ........ OK","hd"],["    block 0x40 .. 0x80 ........ OK","hd"],["    block 0x80 .. 0xC0 ........ OK","hd"],["[*] injection dans process hôte : lsass.exe (pid 612)","hb"],["[+] thread distant créé — CreateRemoteThread OK","hg"],["[*] élévation des privilèges : SeDebugPrivilege","hb"],["    token volé : NT AUTHORITY\\SYSTEM","hd"],["[*] désactivation antivirus poste ........ DISABLED","hr"],["[*] désactivation journaux d'audit ....... CLEARED","hr"],["[*] installation keylogger résident ...... ACTIF","hr"],["[*] persistance via tâche planifiée \\svc_host","hd"],["[*] établissement tunnel C2 -> 10.84.0.1:443","hb"],["    handshake TLS forgé ........ accepté","hd"],["    canal chiffré établi ....... AES-256-GCM","hd"],["[+] beacon C2 actif (intervalle 30s)","hg"],["[*] ouverture du shell distant root@dhs ...","hb"],["[+] PAYLOAD ACTIF — commandes terminal débloquées","hg"]];
-const matrixChars="01░▒▓<>{}[]#$%&*+=ABCDEF0123456789";
-let virusRunning=false,matrixIv=null;
-function runVirus(){if(!S.usbInserted){toast("Clé USB retirée — impossible d'exécuter","red");return;}if(S.payloadDeployed){toast("Payload déjà déployé","amber");return;}if(virusRunning)return;virusRunning=true;
-  const g=document.getElementById("glitch");g.classList.add("on");setTimeout(()=>g.classList.remove("on"),1200);threat("MODÉRÉE","warn");
-  const hk=document.getElementById("hack");hk.classList.add("show");const logEl=document.getElementById("hackLog"),barEl=document.getElementById("hackBar"),pctEl=document.getElementById("hackPct"),phEl=document.getElementById("hackPhase"),doneEl=document.getElementById("hackDone");logEl.innerHTML="";barEl.style.width="0%";pctEl.textContent="0%";doneEl.style.display="none";
-  const mx=document.getElementById("hackMatrix");const cols=Math.floor(window.innerWidth/12);function genMatrix(){let rows=Math.floor(window.innerHeight/14),out="";for(let r=0;r<rows;r++){let line="";for(let cI=0;cI<cols;cI++)line+=matrixChars[Math.floor(Math.random()*matrixChars.length)];out+=line+"\n";}mx.textContent=out;}genMatrix();matrixIv=setInterval(genMatrix,90);
-  const phases=["Init… ","Décryptage charge utile… ","Injection process… ","Élévation privilèges… ","Tunnel C2… ","Finalisation… "];let i=0,tot=hackScript.length;
-  const iv=setInterval(()=>{if(i>=tot){clearInterval(iv);barEl.style.width="100%";pctEl.textContent="100%";phEl.textContent="Terminé.";doneEl.style.display="block";S.payloadDeployed=true;virusRunning=false;persist();discordNotify("☠ PAYLOAD DÉPLOYÉ","`deploy.exe` exécuté avec succès. Accès root obtenu sur le poste. Tunnel C2 actif.","alert");setTimeout(()=>{clearInterval(matrixIv);hk.classList.remove("show");toast("Payload déployé — terminal débloqué","red");if(!openWins.has("terminal"))openWin("terminal");},2200);return;}const[txt,cls]=hackScript[i];const span=document.createElement("div");if(cls)span.className=cls;span.textContent=txt;logEl.appendChild(span);while(logEl.children.length>16)logEl.removeChild(logEl.firstChild);const pct=Math.round(((i+1)/tot)*100);barEl.style.width=pct+"%";pctEl.textContent=pct+"%";phEl.textContent=phases[Math.min(Math.floor(i/tot*phases.length),phases.length-1)];i++;},230);}
-
-/* ====== DOCUMENTS ====== */
-const DOCS={
-  agentnote:{title:"note_agent.txt",cls:"USAGE INTERNE",meta:["Auteur: L. LAZARO","Modifié: aujourd'hui"],stamp:"",body:`<p>Rappel perso :</p><p>La clé USB « E: » contient le déploiement et le <b>readme.txt</b> avec toute la marche à suivre.</p><p>Le code de la Base se déchiffre via le terminal. Ne pas oublier de retirer la clé à la fin.</p>`},
-  usbreadme:{title:"readme.txt — E:\\",cls:"NON CERTIFIÉ · MARCHE À SUIVRE",meta:["Origine: inconnue","Signature: ABSENTE"],stamp:"",body:`
-    <h4>⚑ OP. BLACKVAULT — Marche à suivre complète</h4>
-    <p style="color:#d23f33">⚠ Périphérique non certifié. Contient <b>deploy.exe</b> (le payload). Suis les étapes dans l'ordre.</p>
-    <div class="cmd-block">
-      <span class="step">ÉTAPE 1 — Déployer le payload</span><br>
-      Clique sur <span class="c">deploy.exe</span> (sur cette clé E:). Le virus s'installe sur le poste : gros chargement plein écran, attends « ACCÈS ROOT OBTENU ».<br><br>
-      <span class="step">ÉTAPE 2 — Casser l'accès (Terminal)</span><br>
-      Ouvre le Terminal et tape, une par une (Entrée à chaque fois) :<br>
-      &nbsp;&nbsp;<span class="c">scan</span>&nbsp;&nbsp;&nbsp;&nbsp;→ cartographie la cible<br>
-      &nbsp;&nbsp;<span class="c">inject</span>&nbsp;&nbsp;→ injecte le payload<br>
-      &nbsp;&nbsp;<span class="c">bypass</span>&nbsp;&nbsp;→ contourne le pare-feu<br>
-      &nbsp;&nbsp;<span class="c">decrypt</span>&nbsp;→ AFFICHE le code à 4 chiffres<br><br>
-      <span class="step">ÉTAPE 3 — Déverrouiller la Base</span><br>
-      Ouvre « Base Centrale », tape le code obtenu → elle s'ouvre.<br><br>
-      <span class="step">ÉTAPE 4 — Exfiltrer</span><br>
-      Clique <span class="c">COPIER LES DONNÉES</span> → le transfert de ~2h démarre.<br><br>
-      <span class="step">ÉTAPE 5 — Finaliser</span><br>
-      À la fin des 2h <b>OU</b> si tu cliques ANNULER, tu DOIS <span class="c">RETIRER LA CLÉ USB</span> (icône USB en bas à droite) pour clôturer l'opération.
-    </div>
-    <div class="warn-note">⚠ Retirer la clé pendant le transfert le met en PAUSE (il reprend ensuite). Toutes les sessions du poste sont synchronisées.</div>`},
-  directive:{title:"Directive Interne 4471",cls:"CONFIDENTIEL",meta:["Réf: DIR-4471-SA","Niveau: 3"],stamp:"",body:`<h4>Objet</h4><p>Renforcement des protocoles d'accès à la Base Centrale suite aux intrusions de Blaine County.</p><h4>Mesures</h4><p>Tout accès requiert un code à 4 chiffres en rotation. Pare-feu palo-grade activé sur tous les nœuds.</p>`},
-  badge:{title:"Badge d'accès — DHS-4471-SA",cls:"CONFIDENTIEL",meta:["Titulaire: L. LAZARO","Validité: active"],stamp:"VALIDE",body:`<h4>Identité</h4><p>Agent : <b>L. LAZARO</b><br>Division : Cyberdéfense<br>Habilitation : <b>4</b></p>`},
-  horaires:{title:"horaires_equipe.txt",cls:"USAGE INTERNE",meta:["Service: Cyberdéfense"],stamp:"",body:`<h4>Rotation</h4><p>Lun-Mer : Équipe Alpha (06h-18h)<br>Jeu-Sam : Équipe Bravo (18h-06h)<br>Dim : astreinte L. LAZARO</p>`},
-  menu:{title:"cafeteria_menu.txt",cls:"PUBLIC",meta:["Cafétéria HQ"],stamp:"",body:`<h4>Menu de la semaine</h4><p>Lundi : burger maison<br>Mardi : tacos<br>Mercredi : poke bowl<br>Jeudi : pâtes carbo<br>Vendredi : surprise du chef</p>`},
-  frais:{title:"note_de_frais.txt",cls:"INTERNE",meta:["Agent: caviardé"],stamp:"",body:`<h4>Frais Q2</h4><p>Carburant véhicule banalisé ... 240$<br>Matériel d'écoute ............. 1 850$<br>Café (beaucoup) .............. 95$</p>`},
-  invent:{title:"inventaire_materiel.txt",cls:"INTERNE",meta:["MAJ: récente"],stamp:"",body:`<h4>Inventaire</h4><p>3x ordinateurs durcis<br>2x radios cryptées<br>1x clé USB NON CERTIFIÉE (égarée ?)<br>5x gilets tactiques</p>`},
-  vieuxmemo:{title:"vieux_memo.txt",cls:"INTERNE",meta:["Daté"],stamp:"",body:`<p>Penser à changer le code de la base, le dernier était trop évident.</p><p>— ne plus utiliser de dates d'anniversaire.</p>`},
-  omega:{title:"DOSSIER OMEGA",cls:"TOP SECRET",meta:["Réf: OMG-009","NIVEAU 5"],stamp:"SECRET",body:`<h4>Synthèse</h4><p>Réseau de trafic d'armes entre Sandy Shores et les docks de Los Santos.</p><table><tr><th>Alias</th><th>Zone</th><th>Statut</th></tr><tr><td>"Corbeau"</td><td>Sandy Shores</td><td class="flag">RECHERCHÉ</td></tr><tr><td>"V."</td><td>Vinewood</td><td class="flag">SURVEILLÉ</td></tr><tr><td><span class="redacted">██████</span></td><td>Paleto Bay</td><td class="flag">ARMÉ</td></tr></table>`},
-  watchlist:{title:"Liste de Surveillance — État SA",cls:"TOP SECRET",meta:["Entrées: 47"],stamp:"SECRET",body:`<h4>Cibles actives</h4><table><tr><th>ID</th><th>Catégorie</th><th>Menace</th></tr><tr><td>SA-1182</td><td>Cyber</td><td class="flag">ÉLEVÉE</td></tr><tr><td>SA-3340</td><td>Évasion</td><td class="flag">CRITIQUE</td></tr></table>`},
-  blackvault:{title:"OP. BLACKVAULT — Plan",cls:"TOP SECRET",meta:["Statut: EN COURS"],stamp:"SECRET",body:`<h4>Objectif</h4><p>Exfiltration des données de la Base Centrale avant rotation des clés de minuit.</p><h4>Fenêtre</h4><p>Transfert ~2h. Toute interruption (retrait USB) suspend sans perte. Retirer la clé en fin d'opération.</p>`},
-  surv1:{title:"Rapport surveillance LS-0412",cls:"CONFIDENTIEL",meta:["Secteur: Los Santos"],stamp:"",body:`<h4>Observations</h4><p>Mouvements suspects près des docks 02:00-04:00.</p><table><tr><th>Heure</th><th>Véhicule</th><th>Note</th></tr><tr><td>02:14</td><td>Fourgon noir</td><td>chargement</td></tr><tr><td>03:41</td><td>SUV gris</td><td class="flag">fuite</td></tr></table>`},
-  surv2:{title:"Interceptions — Canal 7",cls:"CONFIDENTIEL",meta:["Source: SIGINT"],stamp:"",body:`<h4>Extraits</h4><p>"...livraison confirmée pour <span class="redacted">████</span>..."</p><p>"...éviter la patrouille de <span class="redacted">██████</span>..."</p>`},
-
-  /* ====== AGENTS INFILTRÉS ====== */
-  agents_index:{title:"Registre des agents infiltrés — État SA",cls:"TOP SECRET",meta:["Réf: INF-2026-01","Niveau: 5","Compartiment: BLACKVAULT"],stamp:"SECRET",body:`
-    <h4>Synthèse</h4>
-    <p>Liste des agents D.H.S. actuellement <b>sous couverture</b> dans les organisations criminelles de l'État de San Andreas. Chaque dossier détaillé est joint à part. Toute fuite de ce registre entraînera l'extraction immédiate des opérateurs concernés.</p>
-    <table>
-      <tr><th>Alias</th><th>Organisation cible</th><th>Zone</th><th>Statut</th></tr>
-      <tr><td>"CORBEAU"</td><td>Cartel Madrazo</td><td>Sandy Shores</td><td class="flag">ACTIF</td></tr>
-      <tr><td>"VEINE"</td><td>Lost MC</td><td>Blaine County</td><td class="flag">ACTIF</td></tr>
-      <tr><td>"ECHO-7"</td><td>Ballas Front Yard</td><td>Davis / South LS</td><td class="flag">EN SOMMEIL</td></tr>
-      <tr><td>"NÉON"</td><td>Vagos Locos</td><td>El Burro Heights</td><td class="flag">ACTIF</td></tr>
-      <tr><td>"OURS"</td><td>O'Neil Brothers</td><td>Grand Senora</td><td class="flag">COMPROMIS</td></tr>
-      <tr><td><span class="redacted">██████</span></td><td>Avon Hertz Corp.</td><td>Vinewood Hills</td><td class="flag">COUVERTURE PROFONDE</td></tr>
-    </table>
-    <div class="warn-note">⚠ Ce registre ne doit JAMAIS quitter le poste classé. Aucune copie autorisée vers la clé USB E:.</div>`},
-
-  agent_corbeau:{title:"Dossier — Agent CORBEAU",cls:"TOP SECRET",meta:["Alias: CORBEAU","Identité réelle: caviardée","Mission: 412 jours"],stamp:"SECRET",body:`
-    <h4>Profil</h4>
-    <p>Agent : <span class="redacted">████████</span> · Matricule : <span class="redacted">██████</span><br>
-    Cible : <b>Cartel Madrazo</b> — fait passer pour mécanicien à Sandy Shores depuis 14 mois.<br>
-    Contact : dépose morte au cimetière de Hill Valley, mardi 02h00.</p>
-    <h4>Renseignements remontés</h4>
-    <p>Trois cargaisons d'armes interceptées grâce à ses signalements (Q1 2026). Identité de "Le Comptable" confirmée.</p>
-    <h4>Risques</h4>
-    <p class="flag">Madrazo soupçonne une taupe depuis avril. Tests de loyauté en cours. Extraction d'urgence préparée — RV Sandy Strip 03h00.</p>`},
-
-  agent_veine:{title:"Dossier — Agent VEINE",cls:"TOP SECRET",meta:["Alias: VEINE","Couverture: Prospect Lost MC"],stamp:"SECRET",body:`
-    <h4>Profil</h4>
-    <p>Couverture : prospect du chapitre Blaine County des <b>Lost MC</b>. Patché depuis 7 mois. Tatouages compatibles avec sa légende civile (ex-mécanicien Sandy Shores).</p>
-    <h4>Renseignements remontés</h4>
-    <p>Filière méthamphétamine entre Stab City et Paleto Bay. Plan d'embuscade des Vagos déjoué (mai 2026).</p>
-    <h4>Sécurité</h4>
-    <p>Aucune communication directe. Drop chiffré via radio CB canal 19, codeword "ranger broken".</p>`},
-
-  agent_echo7:{title:"Dossier — Agent ECHO-7",cls:"TOP SECRET",meta:["Alias: ECHO-7","Statut: EN SOMMEIL"],stamp:"SECRET",body:`
-    <h4>État</h4>
-    <p>Agent rappelé au siège suite à fuite suspectée (août 2025). Maintenu dans une couverture de remplacement à Davis. Réactivation conditionnée à l'identification de la source de la fuite.</p>
-    <h4>Hypothèse en cours</h4>
-    <p>Recoupements internes pointent un agent de liaison D.H.S. — probable connivence avec le réseau <b>OMEGA</b>. Voir <i>note_taupes.txt</i>.</p>`},
-
-  agent_neon:{title:"Dossier — Agent NÉON",cls:"TOP SECRET",meta:["Alias: NÉON","Couverture: barman La Mesa"],stamp:"SECRET",body:`
-    <h4>Profil</h4>
-    <p>Sous couverture barman au <i>El Rancho Pequeño</i>, point de chute connu des <b>Vagos Locos</b>. Position idéale d'écoute mais haute exposition.</p>
-    <h4>Renseignements remontés</h4>
-    <p>Plans d'attaque de convoi armurerie LSPD (juin 2026) interceptés grâce à conversations captées au bar. Convoi sécurisé.</p>
-    <h4>Risques</h4>
-    <p class="flag">Membre Vagos l'a interrogé sur ses absences nocturnes. Surveillance renforcée 72h.</p>`},
-
-  agent_ours:{title:"Dossier — Agent OURS",cls:"TOP SECRET",meta:["Alias: OURS","Statut: COMPROMIS"],stamp:"SECRET",body:`
-    <h4>Alerte</h4>
-    <p class="flag">Couverture grillée le <span class="redacted">██/██/2026</span>. Agent extrait sous escorte tactique. Hospitalisé à <span class="redacted">████████</span> sous fausse identité.</p>
-    <h4>Cause de la compromission</h4>
-    <p>Photographie de l'agent publiée sur un forum criminel local. Source de la fuite non identifiée. Enquête interne ouverte (réf. IA-2026-018).</p>
-    <h4>Décision</h4>
-    <p>Identité civile à brûler. Nouvelle légende préparée pour réaffectation sous l'alias "<b>HÊTRE</b>".</p>`},
-
-  agent_redacted:{title:"Dossier — Agent ██████ (couverture profonde)",cls:"TOP SECRET / COMPARTIMENTÉ",meta:["Niveau requis: 5","Compartiment: BLACKVAULT"],stamp:"SECRET",body:`
-    <h4>Restriction</h4>
-    <p>Dossier compartimenté — accessible uniquement aux porteurs du clearance <b>BLACKVAULT</b>. Toute consultation est journalisée et notifiée à la cellule de contre-ingérence.</p>
-    <h4>Extraits autorisés</h4>
-    <p>Cible : <b>Avon Hertz Corp.</b> · Couverture : <span class="redacted">████████ ████████</span><br>
-    Durée actuelle : <span class="redacted">██ mois</span><br>
-    Dernier contact : <span class="redacted">██/██/2026</span></p>
-    <p>Mission : <span class="redacted">████████████████████████████████████</span></p>
-    <div class="warn-note">⚠ Toute exfiltration de ce dossier vers un support amovible déclenchera une alerte rouge automatique.</div>`},
-
-  note_taupes:{title:"note_taupes.txt",cls:"USAGE INTERNE — CONTRE-INGÉRENCE",meta:["Auteur: L. LAZARO","Modifié: récemment"],stamp:"",body:`
-    <p>Récap perso pour le brief de jeudi :</p>
-    <p>3 fuites confirmées en 18 mois (CORBEAU surveillé, ECHO-7 grillé, OURS extrait). Schéma commun : info qui ne sort pas du serveur S: → toujours dans la <b>même fenêtre de 72h</b> avant compromission.</p>
-    <ol>
-      <li>Liste réduite des accès S: niveau 5 (12 agents).</li>
-      <li>Recouper avec les <i>badge_logs</i> de la salle classée — qui consulte les dossiers INF avant chaque fuite ?</li>
-      <li>Le badge <span class="redacted">DHS-████-SA</span> est apparu 3x sur 3 incidents. À creuser.</li>
-    </ol>
-    <div class="warn-note">⚠ Ne PAS aborder en réunion ouverte. Garder pour brief restreint avec le directeur de division.</div>`},
-
-  protocole_extraction:{title:"Protocole d'extraction d'urgence — INF-04",cls:"CONFIDENTIEL",meta:["Réf: PROT-INF-04","Validité: 12 mois"],stamp:"",body:`
-    <h4>Déclencheurs</h4>
-    <p>L'extraction d'un agent infiltré est déclenchée si <b>au moins l'un</b> de ces signaux est observé :</p>
-    <ol>
-      <li>Codeword de détresse émis (audio ou silencieux).</li>
-      <li>Absence de check-in chiffré pendant <b>72h</b>.</li>
-      <li>Apparition d'éléments d'identité réelle sur supports criminels.</li>
-      <li>Signal "TANGO BURN" sur radio courte.</li>
-    </ol>
-    <h4>Procédure</h4>
-    <div class="cmd-block">
-      <span class="step">PHASE 1</span> — Brouillage des comms locales + dépêche équipe tactique (10 min).<br>
-      <span class="step">PHASE 2</span> — Récupération sur point d'extraction primaire ou secondaire.<br>
-      <span class="step">PHASE 3</span> — Transfert vers <i>safe house</i> hors district. Décontamination identité (badges, comptes, véhicules).<br>
-      <span class="step">PHASE 4</span> — Réaffectation ou retraite anticipée selon le degré de compromission.
-    </div>`},
-
-  liaison_handlers:{title:"liste_officiers_traitants.txt",cls:"CONFIDENTIEL",meta:["MAJ: hebdomadaire"],stamp:"",body:`
-    <h4>Officiers traitants (handlers) actifs</h4>
-    <table>
-      <tr><th>Handler</th><th>Agent suivi</th><th>RV régulier</th></tr>
-      <tr><td>L. LAZARO</td><td>CORBEAU</td><td>Cimetière Hill Valley — mardi 02h00</td></tr>
-      <tr><td>K. MORALES</td><td>VEINE</td><td>CB canal 19 — codeword "ranger broken"</td></tr>
-      <tr><td><span class="redacted">██████</span></td><td>NÉON</td><td>Drop boîte morte — Vinewood Plaza</td></tr>
-      <tr><td><span class="redacted">██████</span></td><td>ECHO-7</td><td>EN SOMMEIL — pas de contact</td></tr>
-    </table>`},
-};
-function openDoc(id){const d=DOCS[id];if(!d)return;document.getElementById("docWinTitle").textContent=d.title;const stamp=d.stamp?`<div class="doc-stamp">${d.stamp}</div>`:"";document.getElementById("docContent").innerHTML=`<div class="doc-head"><div class="doc-cls">// ${d.cls} //</div><div class="doc-title">${d.title}</div><div class="doc-meta">${d.meta.map(m=>`<span>${m}</span>`).join("")}</div></div>${stamp}<div class="doc-body">${d.body}</div>`;openWin("doc");renderTaskbar();}
-
-/* ====== JUNK APPS ====== */
-function openJunk(kind){const inner=document.getElementById("appInner"),title=document.getElementById("appWinTitle"),iconEl=document.getElementById("appIcon");const meta=DESK_ICONS.find(x=>x.junk===kind);title.textContent=meta?meta.label:"Application";iconEl.innerHTML=meta?meta.ic.replace('<svg','<svg width="14" height="14"'):"";if(kind==="calc"){inner.innerHTML=calcHTML();bindCalc();}else if(kind==="pad")inner.innerHTML=`<div class="pad-app"><textarea placeholder="Notes rapides…"></textarea></div>`;else if(kind==="clock")inner.innerHTML=`<div class="clock-app"><div class="big" id="clockBig">--:--:--</div><div class="date">${new Date().toLocaleDateString("fr-FR",{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div></div>`;else if(kind==="gallery")inner.innerHTML=galleryHTML();openWin("app");renderTaskbar();}
-function calcHTML(){const keys=["C","±","%","÷","7","8","9","×","4","5","6","-","1","2","3","+","0",".","="];let g="";keys.forEach(k=>{const op=["÷","×","-","+","="].includes(k);g+=`<div class="calc-btn ${k==="="?"eq":op?"op":""}" data-k="${k}">${k}</div>`;});return `<div class="calc"><div class="calc-screen" id="calcScreen">0</div><div class="calc-grid">${g}</div></div>`;}
-function bindCalc(){const screen=document.getElementById("calcScreen");let cur="0",prev=null,op=null,fresh=false;function upd(){screen.textContent=cur.length>12?parseFloat(cur).toExponential(4):cur;}document.querySelectorAll(".calc-btn").forEach(b=>b.onclick=()=>{const k=b.dataset.k;if(/[0-9]/.test(k)){if(fresh||cur==="0"){cur=k;fresh=false;}else cur+=k;}else if(k==="."){if(!cur.includes("."))cur+=".";}else if(k==="C"){cur="0";prev=null;op=null;}else if(k==="±"){cur=String(parseFloat(cur)*-1);}else if(k==="%"){cur=String(parseFloat(cur)/100);}else if(["+","-","×","÷"].includes(k)){prev=parseFloat(cur);op=k;fresh=true;}else if(k==="="){if(op!==null&&prev!==null){let a=prev,b=parseFloat(cur),r=0;if(op==="+")r=a+b;if(op==="-")r=a-b;if(op==="×")r=a*b;if(op==="÷")r=b?a/b:0;cur=String(Math.round(r*1e8)/1e8);op=null;prev=null;fresh=true;}}upd();});}
-function galleryHTML(){const ph=[["CAM-04 · Docks LS","#1a2230"],["CAM-09 · Sandy Shores","#221a1a"],["DRONE-02 · Vinewood","#1a221c"],["CAM-12 · Paleto Bay","#1c1a22"]];return `<div class="gallery">${ph.map(p=>`<div class="gphoto" style="background:linear-gradient(135deg,${p[1]},#0a0e14)"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#3a4754" stroke-width="1.2"><rect x="3" y="6" width="18" height="13" rx="2"/><circle cx="12" cy="12.5" r="3.5"/></svg><div class="lbl">${p[0]}</div></div>`).join("")}</div>`;}
-
-/* ====== DATABASE ====== */
-function renderDatabase(){const inner=document.getElementById("dbInner");if(!inner)return;if(!S.dbUnlocked){inner.innerHTML=`<div class="db-lock"><svg class="lockic" viewBox="0 0 24 24" fill="none" stroke="#d23f33" stroke-width="1.3"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/><circle cx="12" cy="15.5" r="1.3"/></svg><div class="lt">BASE CENTRALE VERROUILLÉE</div><div class="ls">Entrez le code d'accès à 4 chiffres</div><div class="lstatus" id="dbStatus"></div><div class="db-code-box" id="dbCodeBox"><div class="db-cell"></div><div class="db-cell"></div><div class="db-cell"></div><div class="db-cell"></div></div><div class="db-keypad" id="dbKeypad"><div class="db-key" data-k="1">1</div><div class="db-key" data-k="2">2</div><div class="db-key" data-k="3">3</div><div class="db-key" data-k="4">4</div><div class="db-key" data-k="5">5</div><div class="db-key" data-k="6">6</div><div class="db-key" data-k="7">7</div><div class="db-key" data-k="8">8</div><div class="db-key" data-k="9">9</div><div class="db-key" data-k="clear">←</div><div class="db-key" data-k="0">0</div><div class="db-key" data-k="ok">▶</div></div><div class="db-hint">Le code se déchiffre via le Terminal (commande <b style="color:#e0a93a">decrypt</b>) après exécution de deploy.exe.</div></div>`;S.dbEntry="";document.getElementById("dbKeypad").addEventListener("click",dbKey);}else renderDbUnlocked();}
-function dbKey(e){const k=e.target.closest(".db-key");if(!k)return;const v=k.dataset.k;if(v==="clear")S.dbEntry=S.dbEntry.slice(0,-1);else if(v==="ok"){checkDb();return;}else if(S.dbEntry.length<4)S.dbEntry+=v;paintDb();if(S.dbEntry.length===4)setTimeout(checkDb,160);}
-function paintDb(){document.querySelectorAll("#dbCodeBox .db-cell").forEach((c,i)=>{c.classList.remove("err");c.classList.toggle("filled",i<S.dbEntry.length);c.textContent=i<S.dbEntry.length?S.dbEntry[i]:"";});}
-function checkDb(){if(S.dbEntry===DB_CODE){S.dbUnlocked=true;persist();toast("Base Centrale déverrouillée","green");discordNotify("🔓 BASE CENTRALE DÉVERROUILLÉE","Code à 4 chiffres validé. Accès aux dossiers TOP SECRET débloqué.","alert");renderDbUnlocked();}else{const st=document.getElementById("dbStatus");if(st)st.textContent="CODE REFUSÉ — accès journalisé";document.querySelectorAll("#dbCodeBox .db-cell").forEach(c=>c.classList.add("err"));discordNotify("⚠ Tentative refusée","Code incorrect saisi sur la Base Centrale (accès journalisé).","warn");S.dbEntry="";setTimeout(paintDb,400);}}
-function renderDbUnlocked(){const inner=document.getElementById("dbInner");inner.innerHTML=`<div class="db-main"><div class="db-toolbar"><span class="dbt-title">BASE CENTRALE</span><span class="dbt-sub">CONNECTÉ — niveau 5</span></div><div class="db-content"><div class="db-section-title">Données confidentielles disponibles</div><div class="db-records">${dbRec("Registre national des cibles","48 240 entrées · chiffré","1.8 Go","TOP SECRET")}${dbRec("Archives SIGINT — interceptions","12 ans · audio + transcripts","940 Mo","TOP SECRET")}${dbRec("Réseau d'informateurs","identités protégées","210 Mo","NIVEAU 5")}${dbRec("Dossiers OMEGA (complet)","opérations actives","620 Mo","TOP SECRET")}</div><div class="copy-panel"><div class="copy-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg><span class="ch-title">Exfiltration des données</span></div><div class="copy-target">→ destination : E:\\BLACKVAULT\\dump.enc  ·  3.6 Go</div><div class="copy-btn-row"><button class="btn primary" id="copyBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg><span id="copyBtnTxt">COPIER LES DONNÉES</span></button></div><div class="dl-zone" id="dlZone"><div class="dl-status-row"><span class="dl-status" id="dlStatus">Transfert en cours…</span><span class="dl-pct" id="dlPct">0%</span></div><div class="dl-track"><div class="dl-fill" id="dlFill"></div></div><div class="dl-meta"><span>Débit : <b id="dlRate">2.1 Mo/s</b></span><span>Temps restant : <b id="dlEta">02:00:00</b></span></div><div class="dl-controls" id="dlControls"></div></div></div></div></div>`;const cb=document.getElementById("copyBtn");if(cb)cb.onclick=startDownload;if(S.dl.active||S.dl.accumulated>0||S.dl.completed||S.needUsbRemoval)refreshDlView();}
-function dbRec(n,m,s,c){return `<div class="db-rec"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M6 2h9l5 5v15H6V2z"/><path d="M15 2v5h5"/></svg><div class="rinfo"><div class="rname">${n}</div><div class="rmeta">${m}</div></div><div class="rsize">${s}</div><div class="rcls">${c}</div></div>`;}
-
-/* ====== DOWNLOAD (timestamp model, synchronisé) ====== */
-let dlInterval=null;
-function dlElapsed(){if(S.dl.completed)return DL_TOTAL;if(!S.dl.active)return S.dl.accumulated;return Math.min(S.dl.accumulated+(Date.now()-S.dl.startedAt)/1000*S.dl.rate,DL_TOTAL);}
-function startDownload(){
-  if(!S.usbInserted){toast("Aucune clé USB — destination indisponible","red");return;}
-  if(S.dl.completed){toast("Copie déjà terminée — retirez la clé USB","green");return;}
-  if(S.dl.active)return;
-  const resumed = S.dl.accumulated>0;
-  S.dl.active=true;S.dl.startedAt=Date.now();S.needUsbRemoval=false;
-  persist();runDlTick();
-  toast(resumed?"Transfert relancé":"Transfert démarré — ~2h","amber");
-  discordNotify(resumed?"▶ Transfert REPRIS":"▶ Transfert DÉMARRÉ",
-    resumed?"Reprise de l'exfiltration vers `E:\\BLACKVAULT\\dump.enc`.":"Exfiltration des données vers `E:\\BLACKVAULT\\dump.enc` — durée estimée ~2h.","info");
-}
-function runDlTick(){if(dlInterval)clearInterval(dlInterval);dlInterval=setInterval(()=>{refreshDlView();if(dlElapsed()>=DL_TOTAL&&S.dl.active){S.dl.active=false;S.dl.completed=true;S.dl.accumulated=DL_TOTAL;S.needUsbRemoval=true;clearInterval(dlInterval);dlInterval=null;persist();finishDownload();}},1000);}
-function pauseDownload(msg,requireRemoval){
-  if(!S.dl.active&&!requireRemoval)return;
-  if(S.dl.active){S.dl.accumulated=dlElapsed();S.dl.active=false;}
-  if(dlInterval){clearInterval(dlInterval);dlInterval=null;}
-  if(requireRemoval)S.needUsbRemoval=true;
-  persist();refreshDlView();
-  toast(msg||"Transfert suspendu","red");
-  discordNotify(requireRemoval?"⛔ Transfert ANNULÉ":"⏸ Transfert MIS EN PAUSE",
-    (msg||"Transfert suspendu")+(requireRemoval?" — clé USB à retirer.":""),"warn");
-}
-function finishDownload(){
-  refreshDlView();
-  toast("COPIE TERMINÉE — retirez la clé USB","green");
-  threat("CRITIQUE","bad");
-  syncUI();
-  discordNotify("✅ EXFILTRATION RÉUSSIE","Dump complet copié sur `E:\\BLACKVAULT\\dump.enc` (3.6 Go). Retrait de la clé USB requis pour clôturer.","ok");
-}
-function fmtTime(s){const p=n=>String(n).padStart(2,"0");return p(Math.floor(s/3600))+":"+p(Math.floor((s%3600)/60))+":"+p(Math.floor(s%60));}
-function refreshDlView(){const z=document.getElementById("dlZone");if(!z)return;if(S.dl.active||S.dl.accumulated>0||S.dl.completed||S.needUsbRemoval)z.classList.add("show");const el=dlElapsed(),pct=Math.floor(el/DL_TOTAL*100),rem=DL_TOTAL-el;const fill=document.getElementById("dlFill"),pe=document.getElementById("dlPct"),eta=document.getElementById("dlEta"),rate=document.getElementById("dlRate"),st=document.getElementById("dlStatus");if(fill)fill.style.width=pct+"%";if(pe)pe.textContent=pct+"%";if(eta)eta.textContent=fmtTime(rem);
-  if(S.dl.completed){if(st){st.textContent="COPIE TERMINÉE ✓"+(S.dl.rate>1?" (accéléré)":"");st.className="dl-status done";}if(eta)eta.textContent="00:00:00";if(rate)rate.textContent="—";}
-  else if(S.dl.active){if(st){st.textContent="Transfert en cours…"+(S.dl.rate>1?" ⏩":"");st.className="dl-status";}if(rate)rate.textContent=(S.dl.rate>1?"380":(1.8+Math.random()*0.9).toFixed(1))+" Mo/s";}
-  else{if(st){st.textContent="Transfert suspendu";st.className="dl-status paused";}if(rate)rate.textContent="— en pause —";}
-  renderDlControls();}
-function renderDlControls(){const c=document.getElementById("dlControls");if(!c)return;const copyBtn=document.getElementById("copyBtn"),copyTxt=document.getElementById("copyBtnTxt");
-  if(S.dl.completed){c.innerHTML='<span style="font-family:var(--mono);font-size:12px;color:#43b25a">✓ Données copiées sur E:\\BLACKVAULT\\dump.enc</span>';if(copyBtn)copyBtn.disabled=true;}
-  else if(S.dl.active){c.innerHTML='';const b=document.createElement("button");b.className="btn danger";b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M18 6L6 18M6 6l12 12"/></svg>ANNULER';b.onclick=()=>pauseDownload("Transfert annulé — retirez la clé USB",true);c.appendChild(b);if(copyBtn)copyBtn.disabled=true;}
-  else{c.innerHTML='';if(copyBtn){copyBtn.disabled=false;if(copyTxt)copyTxt.textContent=S.dl.accumulated>0?"REPRENDRE LE TRANSFERT":"COPIER LES DONNÉES";}}
-  if(S.needUsbRemoval){const p=document.createElement("div");p.className="usb-prompt";p.style.width="100%";p.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="9" y="2" width="6" height="13" rx="1"/><path d="M9 8h6M12 15v5M9 20h6"/></svg> RETIREZ LA CLÉ USB pour clôturer l\'opération (icône USB en bas à droite).';c.appendChild(p);}}
-
-/* ====== USB TRAY ====== */
-const usbTray=document.getElementById("usbTray");usbTray.onclick=toggleUsb;
-usbTray.addEventListener("contextmenu",e=>{e.preventDefault();showUsbMenu(e.clientX,e.clientY);});
-
-function showUsbMenu(x,y){
-  closeUsbMenu();
-  const m=document.createElement("div");
-  m.id="usbCtxMenu";
-  m.style.cssText="position:fixed;z-index:9999;background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:6px;min-width:210px;box-shadow:0 18px 42px rgba(0,0,0,.6);font-family:var(--mono);font-size:12px;";
-  const items = S.usbInserted
-    ? [{lbl:"🔌  Retirer la clé USB",act:toggleUsb,danger:true},
-       {lbl:"♻  Réinitialiser l'état",act:doReset,danger:true}]
-    : [{lbl:"🔌  Connecter la clé USB",act:toggleUsb},
-       {lbl:"♻  Réinitialiser l'état",act:doReset,danger:true}];
-  items.forEach(it=>{
-    const b=document.createElement("div");
-    b.textContent=it.lbl;
-    b.style.cssText="padding:9px 12px;border-radius:6px;cursor:pointer;color:"+(it.danger?"var(--red)":"var(--txt)")+";transition:.1s";
-    b.onmouseenter=()=>b.style.background="var(--panel3)";
-    b.onmouseleave=()=>b.style.background="transparent";
-    b.onclick=()=>{closeUsbMenu();it.act();};
-    m.appendChild(b);
+function filtered(){
+  return ITEMS.filter(i=>{
+    if(activeCat!=="Toutes" && i.category!==activeCat) return false;
+    if(search){ const q=search.toLowerCase(); if(!(i.item.toLowerCase().includes(q)||i.storage.toLowerCase().includes(q))) return false; }
+    return true;
   });
-  document.body.appendChild(m);
-  // place to fit
-  const w=m.offsetWidth, h=m.offsetHeight;
-  m.style.left=(Math.min(x, window.innerWidth-w-8))+"px";
-  m.style.top =(Math.max(8, y - h - 6))+"px";
-}
-function closeUsbMenu(){const m=document.getElementById("usbCtxMenu");if(m)m.remove();}
-document.addEventListener("click",e=>{ if(!e.target.closest("#usbCtxMenu") && !e.target.closest("#usbTray")) closeUsbMenu(); });
-window.addEventListener("blur",closeUsbMenu);
-function toggleUsb(){
-  if(S.usbInserted){
-    S.usbInserted=false;
-    if(S.dl.active){pauseDownload("Clé USB retirée — transfert suspendu");}
-    if(S.needUsbRemoval){
-      S.needUsbRemoval=false;
-      toast("Clé USB retirée en sécurité — opération clôturée","green");
-      discordNotify("🔌 Clé USB retirée (fin d'opération)","Opération clôturée proprement après transfert.","ok");
-    } else if(!S.dl.active){
-      toast("Clé USB retirée","red");
-      discordNotify("🔌 Clé USB déconnectée","Le périphérique externe a été retiré du poste.","alert");
-    }
-    persist();
-    usbTray.classList.add("gone");usbTray.classList.remove("pulse");
-    document.getElementById("usbTrayTxt").textContent="USB retirée";
-    renderFiles();refreshDlView();
-  } else {
-    S.usbInserted=true;
-    persist();
-    usbTray.classList.remove("gone");
-    document.getElementById("usbTrayTxt").textContent="USB";
-    toast("Clé USB reconnectée","green");
-    discordNotify("🔌 Clé USB connectée","Périphérique externe rebranché sur le poste.","ok");
-    renderFiles();refreshDlView();
-  }
 }
 
-/* ====== RESET ====== */
-function doReset(){if(dlInterval){clearInterval(dlInterval);dlInterval=null;}S=freshState();curThreat={lvl:"FAIBLE",cls:""};try{localStorage.removeItem(SYNC_KEY);}catch(e){}lastRev=Date.now();usbTray.classList.remove("gone","pulse");document.getElementById("usbTrayTxt").textContent="USB";document.getElementById("hack").classList.remove("show");if(matrixIv)clearInterval(matrixIv);virusRunning=false;persist();threatRender();renderFiles();renderDatabase();refreshDlView();toast("État réinitialisé (toutes sessions)","green");discordNotify("♻ ÉTAT RÉINITIALISÉ","La partie a été remise à zéro pour toutes les sessions connectées.","info");}
-window.dhsReset = doReset; // fallback console : tape "dhsReset()" si Ctrl+F9 ne passe pas
+function renderStats(){
+  const totalItems = ITEMS.reduce((a,i)=>a+i.qty,0);
+  const refs = ITEMS.length;
+  const storages = new Set(ITEMS.map(i=>i.storage)).size;
+  const moves = TX.length;
+  const data=[
+    {v:totalItems, l:"Objets en stock", ic:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ff7a00" stroke-width="1.6"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/></svg>'},
+    {v:refs, l:"Références", ic:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ff7a00" stroke-width="1.6"><path d="M4 4h16v4H4zM4 10h16v4H4zM4 16h16v4H4z"/></svg>'},
+    {v:storages, l:"Stockages", ic:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ff7a00" stroke-width="1.6"><path d="M3 9l9-6 9 6v10a1 1 0 01-1 1H4a1 1 0 01-1-1z"/></svg>'},
+    {v:(moves>0?"+":"")+moves, l:"Mouvements aujourd'hui", ic:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ff7a00" stroke-width="1.6"><path d="M3 17l6-6 4 4 7-7"/><path d="M14 8h6v6"/></svg>'},
+  ];
+  document.getElementById("stats").innerHTML = data.map(s=>
+    `<div class="stat"><div class="si">${s.ic}</div><div class="sv">${s.v}</div><div class="sl">${s.l}</div></div>`).join("");
+}
 
-/* ====== TURBO (touche secrète F9) ====== */
-document.addEventListener("keydown",e=>{
-  /* Ctrl+F9 : reset complet de l'état partagé (tous les navigateurs).
-     Fallback si la touche est interceptée : taper dhsReset() dans la console. */
-  if(e.key==="F9" && (e.ctrlKey||e.metaKey)){
-    e.preventDefault(); e.stopPropagation();
-    doReset();
+function renderCats(){
+  const counts=categories();
+  const all=Object.values(counts).reduce((a,b)=>a+b,0);
+  let html=`<div class="chip ${activeCat==="Toutes"?"active":""}" data-cat="Toutes">Toutes <span class="cc">${all}</span></div>`;
+  Object.keys(counts).sort().forEach(c=>{
+    html+=`<div class="chip ${activeCat===c?"active":""}" data-cat="${c}">${c} <span class="cc">${counts[c]}</span></div>`;
+  });
+  const el=document.getElementById("cats");
+  el.innerHTML=html;
+  el.querySelectorAll(".chip").forEach(ch=>ch.onclick=()=>{activeCat=ch.dataset.cat;render();});
+}
+
+function renderStorages(){
+  const list=filtered();
+  const byStorage={};
+  list.forEach(i=>{(byStorage[i.storage]=byStorage[i.storage]||[]).push(i);});
+  const cont=document.getElementById("storages");
+
+  if(!list.length){
+    cont.innerHTML=`<div class="empty"><svg width="54" height="54" viewBox="0 0 24 24" fill="none" stroke="#5f5c57" stroke-width="1.3"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/></svg><div>${ITEMS.length? "Aucun résultat pour ce filtre." : "Aucun stock enregistré pour l'instant.<br>Les mouvements postés dans Discord apparaîtront ici."}</div></div>`;
     return;
   }
-  /* F9 seul : turbo download */
-  if(e.key===TURBO_KEY && !e.ctrlKey && !e.metaKey){e.preventDefault();if(S.dl.active){S.dl.accumulated=dlElapsed();S.dl.startedAt=Date.now();}S.dl.rate=S.dl.rate===1?TURBO_MULT:1;persist();refreshDlView();toast("Mode accéléré : "+(S.dl.rate>1?"ACTIVÉ":"désactivé")+" (x"+TURBO_MULT+")",S.dl.rate>1?"amber":"green");}
-}, true); // capture phase = ne se fait pas voler la touche par d'autres listeners
 
-/* ====== TOAST ====== */
-function toast(msg,type){const t=document.createElement("div");t.className="toast"+(type==="red"?" red":type==="green"?" green":"");t.textContent=msg;document.getElementById("toast-wrap").appendChild(t);setTimeout(()=>{t.style.transition="opacity .3s,transform .3s";t.style.opacity="0";t.style.transform="translateX(30px)";setTimeout(()=>t.remove(),300);},3000);}
+  cont.innerHTML = Object.keys(byStorage).sort().map(storage=>{
+    const items=byStorage[storage].sort((a,b)=>b.qty-a.qty);
+    const total=items.reduce((a,i)=>a+i.qty,0);
+    const isCol=collapsed.has(storage);
+    const cards=items.map(it=>{
+      const d=dayDelta(storage,it.item);
+      const badge = d!==0 ? `<span class="ibadge ${d>0?"up":"down"}">${d>0?"+":""}${d} auj.</span>` : "";
+      return `<div class="item ${it.qty<=LOW_STOCK?"low":""}">
+        ${badge}
+        <div class="iic">${catIcon(it.category)}</div>
+        <div><div class="iname">${cap(it.item)}</div><div class="icat">${it.category}</div></div>
+        <div class="iqty">${it.qty}</div>
+      </div>`;
+    }).join("");
+    return `<div class="storage ${isCol?"collapsed":""}" data-storage="${storage}">
+      <div class="storage-head">
+        <div class="shic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#ff7a00" stroke-width="1.7"><path d="M3 9l9-6 9 6v10a1 1 0 01-1 1H4a1 1 0 01-1-1z"/><path d="M9 21V12h6v9"/></svg></div>
+        <div><div class="shn">${cap(storage)}</div><div class="shm">${items.length} référence${items.length>1?"s":""}</div></div>
+        <div class="shtot">${total} obj.</div>
+        <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9a978f" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+      </div>
+      <div class="grid">${cards}</div>
+    </div>`;
+  }).join("");
 
-/* ====== PONT FIVEM (optionnel, pour vraie synchro multi-joueurs) ======
-   Pour synchroniser entre PC de joueurs différents (réseau), relaie l'état
-   via ton resource Lua. Côté NUI, écoute les messages serveur et appelle :
-       window.addEventListener('message', e => { if(e.data && e.data.dhsState) applyRemote(e.data.dhsState); });
-   Et pour pousser l'état vers le serveur, après chaque persist() tu peux faire
-   un fetch('https://TON_RESOURCE/sync', {method:'POST', body:JSON.stringify(snapshot())}).
-   Donne-moi ton setup (nom de resource, events) et je te câble le bridge complet.
-======================================================================== */
+  cont.querySelectorAll(".storage-head").forEach(h=>h.onclick=()=>{
+    const s=h.parentElement.dataset.storage;
+    if(collapsed.has(s))collapsed.delete(s); else collapsed.add(s);
+    h.parentElement.classList.toggle("collapsed");
+  });
+}
+
+function renderFeed(){
+  const el=document.getElementById("feed");
+  if(!TX.length){ el.innerHTML=`<div class="empty" style="padding:30px">Aucun mouvement aujourd'hui.</div>`; return; }
+  el.innerHTML = TX.slice(0,30).map(t=>{
+    const time=new Date(t.ts).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit",timeZone:"Europe/Paris"});
+    return `<div class="fline ${t.delta>0?"up":"down"}">
+      <span class="fdot"></span>
+      <span class="fdelta">${t.delta>0?"+":""}${t.delta}</span>
+      <span class="fitem">${cap(t.item)}</span>
+      <span class="floc">› ${cap(t.storage)}</span>
+      <span class="ftime">${time}${t.author?" · "+t.author:""}</span>
+    </div>`;
+  }).join("");
+}
+
+function render(){ renderStats(); renderCats(); renderStorages(); renderFeed(); }
+
+document.getElementById("searchInput").addEventListener("input",e=>{search=e.target.value;renderStorages();});
+
+/* ====== INIT ====== */
+sbInit();
+loadAll().then(subscribe);
+setInterval(loadAll, 30000); // filet de sécurité si le websocket tombe
 </script>
 </body>
 </html>
