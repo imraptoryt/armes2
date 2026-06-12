@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>D.H.S. — San Andreas Secure Terminal</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --bg:#070a0f;--bg2:#0b0f16;--panel:#11161f;--panel2:#161d28;--panel3:#1c2531;
@@ -270,6 +271,13 @@
 /* ====== CONFIG ====== */
 const DB_CODE="7714", DL_TOTAL=2*3600, TURBO_KEY="F9", TURBO_MULT=180, SYNC_KEY="dhs_blackvault_v3";
 
+/* === SUPABASE (remplir avec tes valeurs du dashboard Supabase) ===
+   Ces valeurs sont publiques par design : l'anon key est protégée par RLS
+   (voir supabase-setup.sql). Ne JAMAIS coller la service_role key ici. */
+const SUPABASE_URL  = "https://YOUR-PROJECT-REF.supabase.co";
+const SUPABASE_ANON = "YOUR-ANON-PUBLIC-KEY";
+const ROOM_ID       = "default"; // un seul état partagé pour tout le monde
+
 /* ====== STATE ====== */
 let S=freshState();
 function freshState(){return{
@@ -288,7 +296,11 @@ function snapshot(){return{
   dl:{active:S.dl.active,accumulated:S.dl.accumulated,startedAt:S.dl.startedAt,rate:S.dl.rate,completed:S.dl.completed},
   needUsbRemoval:S.needUsbRemoval,threat:curThreat,rev:Date.now()
 };}
-function persist(){ if(applyingRemote)return; try{const s=snapshot();lastRev=s.rev;localStorage.setItem(SYNC_KEY,JSON.stringify(s));}catch(e){} }
+function persist(){
+  if(applyingRemote)return;
+  try{const s=snapshot();lastRev=s.rev;localStorage.setItem(SYNC_KEY,JSON.stringify(s));}catch(e){}
+  pushRemote();
+}
 function applyRemote(o,initial){
   if(!o)return; if(!initial && (!o.rev || o.rev<=lastRev))return;
   applyingRemote=true; lastRev=o.rev||0;
@@ -300,7 +312,47 @@ function applyRemote(o,initial){
   applyingRemote=false;
 }
 window.addEventListener("storage",e=>{if(e.key===SYNC_KEY&&e.newValue){try{applyRemote(JSON.parse(e.newValue));}catch(_){}}});
-setInterval(()=>{try{const v=localStorage.getItem(SYNC_KEY);if(v)applyRemote(JSON.parse(v));}catch(e){}},1500);
+
+/* ====== SUPABASE BRIDGE (synchro entre PC via Vercel + Supabase) ====== */
+let sb=null, sbReady=false, pushTimer=null, pendingPush=false;
+function sbInit(){
+  if(sb || !window.supabase) return;
+  if(!SUPABASE_URL || SUPABASE_URL.includes("YOUR-PROJECT-REF")) return;
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+    realtime:{ params:{ eventsPerSecond: 10 } }
+  });
+  sbReady=true;
+}
+async function sbFetchInitial(){
+  if(!sbReady) return;
+  try{
+    const { data, error } = await sb.from("dhs_state").select("state").eq("room", ROOM_ID).maybeSingle();
+    if(error){ console.warn("[sync] fetch initial failed",error); return; }
+    if(data && data.state) applyRemote(data.state, true);
+  }catch(e){ console.warn("[sync] fetch threw",e); }
+}
+function sbSubscribe(){
+  if(!sbReady) return;
+  sb.channel("dhs_state_"+ROOM_ID)
+    .on("postgres_changes",
+        { event:"*", schema:"public", table:"dhs_state", filter:"room=eq."+ROOM_ID },
+        payload => { const row = payload.new || payload.record; if(row && row.state) applyRemote(row.state); })
+    .subscribe();
+}
+function pushRemote(){
+  if(!sbReady || applyingRemote) return;
+  pendingPush=true;
+  if(pushTimer) return;
+  pushTimer = setTimeout(async ()=>{
+    pushTimer=null;
+    if(!pendingPush) return;
+    pendingPush=false;
+    try{
+      const s = snapshot();
+      await sb.from("dhs_state").upsert({ room: ROOM_ID, state: s, updated_at: new Date().toISOString() }, { onConflict:"room" });
+    }catch(e){ console.warn("[sync] push failed",e); }
+  }, 250);
+}
 
 function syncUI(){
   const live=document.getElementById("desktop").style.display==="flex"; if(!live)return;
@@ -336,6 +388,7 @@ function startDesktop(){
   document.getElementById("desktop").style.display="flex";
   renderDeskIcons();initTerminal();renderNotes();
   try{const v=localStorage.getItem(SYNC_KEY);if(v)applyRemote(JSON.parse(v),true);}catch(e){}
+  sbInit(); sbFetchInitial().then(sbSubscribe);
   renderFiles();renderDatabase();threatRender();
   if(S.dl.active)runDlTick();
   tickClock();setInterval(tickClock,1000);
