@@ -278,6 +278,11 @@ const SUPABASE_URL  = "https://fgzmbkomdbggfqforxzn.supabase.co";
 const SUPABASE_ANON = "sb_publishable_Y8LbGUHwi7PSnXhhOCLE4Q_9iu3WgVk";
 const ROOM_ID       = "default"; // un seul état partagé pour tout le monde
 
+/* === DISCORD WEBHOOK (notif des events RP)
+   ⚠ URL publique côté client. Si elle se fait spammer, regénère-la dans
+   Discord (Server Settings → Integrations → Webhooks) et recolle ici. */
+const DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1506338037741912064/yjKZmzE9COckt53C1QGb00aEa5Z63gjdr4zKYtypszoFGPSKxa7Ge5oJaJfZSXBROIw6";
+
 /* ====== STATE ====== */
 let S=freshState();
 function freshState(){return{
@@ -362,6 +367,40 @@ function pushRemote(){
   }, 250);
 }
 
+/* ====== DISCORD WEBHOOK (embed notifs RP) ====== */
+const NOTIFY_COLORS = { ok:0x43b25a, info:0xe0a93a, warn:0xe0a93a, alert:0xd23f33, blue:0x3d7dd6 };
+let _notifQueue=[], _notifBusy=false;
+function discordNotify(title, description, type, extra){
+  if(!DISCORD_WEBHOOK || DISCORD_WEBHOOK.includes("YOUR_WEBHOOK")) return;
+  if(applyingRemote) return; // n'envoie que pour les actions LOCALES, pas pour les echo realtime
+  _notifQueue.push({title, description, type, extra});
+  _drainNotif();
+}
+async function _drainNotif(){
+  if(_notifBusy || !_notifQueue.length) return;
+  _notifBusy=true;
+  const { title, description, type, extra } = _notifQueue.shift();
+  const body = {
+    username: "D.H.S. — San Andreas Terminal",
+    embeds: [{
+      title: title || "Évènement",
+      description: description || "",
+      color: NOTIFY_COLORS[type] ?? NOTIFY_COLORS.info,
+      timestamp: new Date().toISOString(),
+      footer: { text: "Agent L. LAZARO · DHS-4471-SA" },
+      ...(extra || {})
+    }]
+  };
+  try{
+    await fetch(DISCORD_WEBHOOK, {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify(body)
+    });
+  }catch(e){ console.warn("[discord] notify failed", e); }
+  setTimeout(()=>{ _notifBusy=false; _drainNotif(); }, 600); // anti rate-limit
+}
+
 function syncUI(){
   const live=document.getElementById("desktop").style.display==="flex"; if(!live)return;
   usbTray.classList.toggle("gone",!S.usbInserted);
@@ -401,6 +440,7 @@ function startDesktop(){
   if(S.dl.active)runDlTick();
   tickClock();setInterval(tickClock,1000);
   toast("Session ouverte — état synchronisé","green");
+  discordNotify("🟢 Connexion agent","Agent **L. LAZARO** (DHS-4471-SA) a ouvert une session sur le poste sécurisé.","ok");
 }
 function tickClock(){const d=new Date(),p=n=>String(n).padStart(2,"0");
   document.getElementById("topClock").textContent=`${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
@@ -453,10 +493,10 @@ async function handleCmd(cmd){const c=cmd.split(/\s+/)[0];switch(c){
   case "clear":termOut.innerHTML="";break;
   case "status":tprint("── ÉTAT DU SYSTÈME ──────────────","amber");tprint("  Payload USB   : "+(S.payloadDeployed?"DÉPLOYÉ":"non déployé"),S.payloadDeployed?"green":"red");tprint("  Scan réseau   : "+(S.hack.scan?"FAIT":"en attente"),S.hack.scan?"green":"dim");tprint("  Injection     : "+(S.hack.inject?"FAIT":"en attente"),S.hack.inject?"green":"dim");tprint("  Bypass FW     : "+(S.hack.bypass?"FAIT":"en attente"),S.hack.bypass?"green":"dim");tprint("  Déchiffrement : "+(S.hack.decrypt?"FAIT":"en attente"),S.hack.decrypt?"green":"dim");tprint("  Base Centrale : "+(S.dbUnlocked?"DÉVERROUILLÉE":"VERROUILLÉE"),S.dbUnlocked?"green":"red");break;
   case "devices":tprint("Périphériques montés :","amber");tprint("  /dev/sda1   Disque Système (C:)        480 Go");tprint("  /dev/sdb1   Archives Sécurisées (S:)   2 To");if(S.usbInserted)tprint("  /dev/sdc1   USB EXTERNE (E:)  [NON CERTIFIÉ]","red");else tprint("  (clé USB retirée)","dim");break;
-  case "scan":if(!S.payloadDeployed){tprint("ERREUR : aucun payload actif. Exécutez deploy.exe depuis la clé USB.","red");break;}await typeOut([["[*] Cartographie du sous-réseau 10.84.0.0/16 ...","blue",250],["    > passerelle 10.84.0.1 ............... vivante","dim",350],["    > noeud base-centrale.dhs.sa ......... vivant","dim",350],["[+] Scan terminé. Cible : base-centrale.dhs.sa","green",250]]);S.hack.scan=true;threat("MODÉRÉE","warn");persist();break;
-  case "inject":if(!S.payloadDeployed){tprint("ERREUR : payload absent. Exécutez deploy.exe.","red");break;}if(!S.hack.scan){tprint("ERREUR : lancez 'scan' d'abord.","red");break;}await typeOut([["[*] Injection du payload via /dev/sdc1 ...","blue",250],["    uploading shellcode .............. 76%","dim",350],["    uploading shellcode ............. 100%","dim",350],["[+] Implant actif sur le noeud distant.","green",250]]);S.hack.inject=true;persist();break;
-  case "bypass":if(!S.hack.inject){tprint("ERREUR : aucun implant actif. Lancez 'inject'.","red");break;}await typeOut([["[*] Analyse du pare-feu D.H.S. ...","blue",250],["    règle 0x1A ... contournée","dim",300],["    handshake TLS forgé ... accepté","dim",340],["[+] Pare-feu contourné. Tunnel ouvert.","green",250]]);S.hack.bypass=true;threat("ÉLEVÉE","bad");persist();break;
-  case "decrypt":if(!S.hack.bypass){tprint("ERREUR : pare-feu actif. Lancez 'bypass'.","red");break;}await typeOut([["[*] Extraction du hash du code d'accès ...","blue",250],["    SHA-256 capturé : 4f7a...e91c","dim",320],["[*] Attaque par dictionnaire ...","blue",350],["    tentatives : 9571 ...","dim",350],["[+] COLLISION TROUVÉE.","green",300]]);S.hack.decrypt=true;persist();tprint("");tprintHTML('<span class="ln-amber">╔══════════════════════════════════╗</span>');tprintHTML('<span class="ln-amber">║  CODE D\'ACCÈS BASE CENTRALE : </span><span class="ln-green" style="font-size:15px;font-weight:bold">'+DB_CODE+'</span><span class="ln-amber">  ║</span>');tprintHTML('<span class="ln-amber">╚══════════════════════════════════╝</span>');tprint("");tprint("→ Ouvrez « Base Centrale » et entrez ce code.","dim");toast("Code déchiffré : "+DB_CODE,"green");break;
+  case "scan":if(!S.payloadDeployed){tprint("ERREUR : aucun payload actif. Exécutez deploy.exe depuis la clé USB.","red");break;}await typeOut([["[*] Cartographie du sous-réseau 10.84.0.0/16 ...","blue",250],["    > passerelle 10.84.0.1 ............... vivante","dim",350],["    > noeud base-centrale.dhs.sa ......... vivant","dim",350],["[+] Scan terminé. Cible : base-centrale.dhs.sa","green",250]]);S.hack.scan=true;threat("MODÉRÉE","warn");persist();discordNotify("📡 SCAN réussi","Sous-réseau 10.84.0.0/16 cartographié. Cible : `base-centrale.dhs.sa`.","info");break;
+  case "inject":if(!S.payloadDeployed){tprint("ERREUR : payload absent. Exécutez deploy.exe.","red");break;}if(!S.hack.scan){tprint("ERREUR : lancez 'scan' d'abord.","red");break;}await typeOut([["[*] Injection du payload via /dev/sdc1 ...","blue",250],["    uploading shellcode .............. 76%","dim",350],["    uploading shellcode ............. 100%","dim",350],["[+] Implant actif sur le noeud distant.","green",250]]);S.hack.inject=true;persist();discordNotify("💉 INJECT réussi","Implant actif sur le noeud distant via `/dev/sdc1`.","warn");break;
+  case "bypass":if(!S.hack.inject){tprint("ERREUR : aucun implant actif. Lancez 'inject'.","red");break;}await typeOut([["[*] Analyse du pare-feu D.H.S. ...","blue",250],["    règle 0x1A ... contournée","dim",300],["    handshake TLS forgé ... accepté","dim",340],["[+] Pare-feu contourné. Tunnel ouvert.","green",250]]);S.hack.bypass=true;threat("ÉLEVÉE","bad");persist();discordNotify("🛡 BYPASS réussi","Pare-feu D.H.S. contourné. Tunnel ouvert vers la cible.","alert");break;
+  case "decrypt":if(!S.hack.bypass){tprint("ERREUR : pare-feu actif. Lancez 'bypass'.","red");break;}await typeOut([["[*] Extraction du hash du code d'accès ...","blue",250],["    SHA-256 capturé : 4f7a...e91c","dim",320],["[*] Attaque par dictionnaire ...","blue",350],["    tentatives : 9571 ...","dim",350],["[+] COLLISION TROUVÉE.","green",300]]);S.hack.decrypt=true;persist();tprint("");tprintHTML('<span class="ln-amber">╔══════════════════════════════════╗</span>');tprintHTML('<span class="ln-amber">║  CODE D\'ACCÈS BASE CENTRALE : </span><span class="ln-green" style="font-size:15px;font-weight:bold">'+DB_CODE+'</span><span class="ln-amber">  ║</span>');tprintHTML('<span class="ln-amber">╚══════════════════════════════════╝</span>');tprint("");tprint("→ Ouvrez « Base Centrale » et entrez ce code.","dim");toast("Code déchiffré : "+DB_CODE,"green");discordNotify("🔑 DECRYPT réussi","Code à 4 chiffres extrait par collision. Accès Base Centrale prêt.","alert");break;
   case "reset":await typeOut([["[!] Effacement des traces ...","red",200],["    purge des logs ............ done","dim",250],["    restauration de l'état initial ...","dim",250]]);doReset();tprint("[+] Système réinitialisé. Toutes traces supprimées.","green");break;
   default:tprint("commande inconnue : "+c+'  (tapez "help")',"red");}}
 function threat(lvl,cls){curThreat={lvl,cls};threatRender();}
@@ -473,13 +513,25 @@ function renderNotes(){const list=document.getElementById("notesList");list.inne
 /* ====== FILES ====== */
 const DRIVES={
   C:{label:"Disque Système (C:)",meta:"480 Go · 312 Go libres",used:35,icon:"hdd",items:[{type:"folder",name:"Système",to:"C_sys"},{type:"folder",name:"Documents Internes",to:"C_docs"},{type:"app",name:"Terminal",app:"terminal"},{type:"app",name:"Notes",app:"notes"},{type:"junk",name:"Calculatrice",junk:"calc"},{type:"junk",name:"Bloc-notes",junk:"pad"},{type:"doc",name:"note_agent.txt",doc:"agentnote",sz:"2 Ko"}]},
-  S:{label:"Archives Sécurisées (S:)",meta:"2 To · 1.4 To libres",used:30,icon:"hdd",items:[{type:"folder",name:"Dossiers Confidentiels",to:"S_conf"},{type:"folder",name:"Surveillance",to:"S_surv"},{type:"folder",name:"Rapports Divers",to:"S_misc"},{type:"app",name:"Base Centrale",app:"database"}]},
+  S:{label:"Archives Sécurisées (S:)",meta:"2 To · 1.4 To libres",used:30,icon:"hdd",items:[{type:"folder",name:"Dossiers Confidentiels",to:"S_conf"},{type:"folder",name:"Agents Infiltrés",to:"S_inf"},{type:"folder",name:"Surveillance",to:"S_surv"},{type:"folder",name:"Rapports Divers",to:"S_misc"},{type:"app",name:"Base Centrale",app:"database"}]},
   E:{label:"USB EXTERNE (E:)",meta:"16 Go · NON CERTIFIÉ",used:88,icon:"usb",usb:true,items:[{type:"virus",name:"deploy.exe",sz:"4.2 Mo"},{type:"doc",name:"readme.txt",doc:"usbreadme",sz:"3 Ko"},{type:"sysfile",name:"payload.bin",sz:"4.0 Mo"}]},
 };
 const FOLDERS={
   C_sys:{path:"C: › Système",items:[{type:"sysfile",name:"kernel.sys",sz:"8 Mo"},{type:"sysfile",name:"boot.cfg",sz:"4 Ko"},{type:"sysfile",name:"crypto.dll",sz:"1.2 Mo"},{type:"sysfile",name:"hal.sys",sz:"640 Ko"}]},
   C_docs:{path:"C: › Documents Internes",items:[{type:"doc",name:"directive_4471.pdf",doc:"directive",sz:"320 Ko"},{type:"doc",name:"badge_acces.pdf",doc:"badge",sz:"180 Ko"},{type:"doc",name:"horaires_equipe.txt",doc:"horaires",sz:"3 Ko"},{type:"doc",name:"cafeteria_menu.txt",doc:"menu",sz:"2 Ko"}]},
   S_conf:{path:"S: › Dossiers Confidentiels",items:[{type:"doc",name:"DOSSIER_OMEGA.pdf",doc:"omega",sz:"1.1 Mo",cls:true},{type:"doc",name:"liste_surveillance.pdf",doc:"watchlist",sz:"640 Ko",cls:true},{type:"doc",name:"op_blackvault.pdf",doc:"blackvault",sz:"880 Ko",cls:true}]},
+  S_inf:{path:"S: › Agents Infiltrés",items:[
+    {type:"doc",name:"REGISTRE_AGENTS_INF.pdf",doc:"agents_index",sz:"1.4 Mo",cls:true},
+    {type:"doc",name:"dossier_CORBEAU.pdf",doc:"agent_corbeau",sz:"720 Ko",cls:true},
+    {type:"doc",name:"dossier_VEINE.pdf",doc:"agent_veine",sz:"680 Ko",cls:true},
+    {type:"doc",name:"dossier_ECHO-7.pdf",doc:"agent_echo7",sz:"510 Ko",cls:true},
+    {type:"doc",name:"dossier_NEON.pdf",doc:"agent_neon",sz:"700 Ko",cls:true},
+    {type:"doc",name:"dossier_OURS.pdf",doc:"agent_ours",sz:"640 Ko",cls:true},
+    {type:"doc",name:"dossier_██████.pdf",doc:"agent_redacted",sz:"— Ko",cls:true},
+    {type:"doc",name:"protocole_extraction.pdf",doc:"protocole_extraction",sz:"310 Ko",cls:true},
+    {type:"doc",name:"officiers_traitants.txt",doc:"liaison_handlers",sz:"6 Ko",cls:true},
+    {type:"doc",name:"note_taupes.txt",doc:"note_taupes",sz:"4 Ko"}
+  ]},
   S_surv:{path:"S: › Surveillance",items:[{type:"doc",name:"rapport_LS_0412.pdf",doc:"surv1",sz:"420 Ko",cls:true},{type:"doc",name:"interceptions.pdf",doc:"surv2",sz:"510 Ko",cls:true},{type:"junk",name:"Galerie surveillance",junk:"gallery"}]},
   S_misc:{path:"S: › Rapports Divers",items:[{type:"doc",name:"note_de_frais.txt",doc:"frais",sz:"1 Ko"},{type:"doc",name:"inventaire_materiel.txt",doc:"invent",sz:"2 Ko"},{type:"doc",name:"vieux_memo.txt",doc:"vieuxmemo",sz:"1 Ko"}]},
 };
@@ -499,7 +551,7 @@ function runVirus(){if(!S.usbInserted){toast("Clé USB retirée — impossible d
   const hk=document.getElementById("hack");hk.classList.add("show");const logEl=document.getElementById("hackLog"),barEl=document.getElementById("hackBar"),pctEl=document.getElementById("hackPct"),phEl=document.getElementById("hackPhase"),doneEl=document.getElementById("hackDone");logEl.innerHTML="";barEl.style.width="0%";pctEl.textContent="0%";doneEl.style.display="none";
   const mx=document.getElementById("hackMatrix");const cols=Math.floor(window.innerWidth/12);function genMatrix(){let rows=Math.floor(window.innerHeight/14),out="";for(let r=0;r<rows;r++){let line="";for(let cI=0;cI<cols;cI++)line+=matrixChars[Math.floor(Math.random()*matrixChars.length)];out+=line+"\n";}mx.textContent=out;}genMatrix();matrixIv=setInterval(genMatrix,90);
   const phases=["Init… ","Décryptage charge utile… ","Injection process… ","Élévation privilèges… ","Tunnel C2… ","Finalisation… "];let i=0,tot=hackScript.length;
-  const iv=setInterval(()=>{if(i>=tot){clearInterval(iv);barEl.style.width="100%";pctEl.textContent="100%";phEl.textContent="Terminé.";doneEl.style.display="block";S.payloadDeployed=true;virusRunning=false;persist();setTimeout(()=>{clearInterval(matrixIv);hk.classList.remove("show");toast("Payload déployé — terminal débloqué","red");if(!openWins.has("terminal"))openWin("terminal");},2200);return;}const[txt,cls]=hackScript[i];const span=document.createElement("div");if(cls)span.className=cls;span.textContent=txt;logEl.appendChild(span);while(logEl.children.length>16)logEl.removeChild(logEl.firstChild);const pct=Math.round(((i+1)/tot)*100);barEl.style.width=pct+"%";pctEl.textContent=pct+"%";phEl.textContent=phases[Math.min(Math.floor(i/tot*phases.length),phases.length-1)];i++;},230);}
+  const iv=setInterval(()=>{if(i>=tot){clearInterval(iv);barEl.style.width="100%";pctEl.textContent="100%";phEl.textContent="Terminé.";doneEl.style.display="block";S.payloadDeployed=true;virusRunning=false;persist();discordNotify("☠ PAYLOAD DÉPLOYÉ","`deploy.exe` exécuté avec succès. Accès root obtenu sur le poste. Tunnel C2 actif.","alert");setTimeout(()=>{clearInterval(matrixIv);hk.classList.remove("show");toast("Payload déployé — terminal débloqué","red");if(!openWins.has("terminal"))openWin("terminal");},2200);return;}const[txt,cls]=hackScript[i];const span=document.createElement("div");if(cls)span.className=cls;span.textContent=txt;logEl.appendChild(span);while(logEl.children.length>16)logEl.removeChild(logEl.firstChild);const pct=Math.round(((i+1)/tot)*100);barEl.style.width=pct+"%";pctEl.textContent=pct+"%";phEl.textContent=phases[Math.min(Math.floor(i/tot*phases.length),phases.length-1)];i++;},230);}
 
 /* ====== DOCUMENTS ====== */
 const DOCS={
@@ -536,6 +588,108 @@ const DOCS={
   blackvault:{title:"OP. BLACKVAULT — Plan",cls:"TOP SECRET",meta:["Statut: EN COURS"],stamp:"SECRET",body:`<h4>Objectif</h4><p>Exfiltration des données de la Base Centrale avant rotation des clés de minuit.</p><h4>Fenêtre</h4><p>Transfert ~2h. Toute interruption (retrait USB) suspend sans perte. Retirer la clé en fin d'opération.</p>`},
   surv1:{title:"Rapport surveillance LS-0412",cls:"CONFIDENTIEL",meta:["Secteur: Los Santos"],stamp:"",body:`<h4>Observations</h4><p>Mouvements suspects près des docks 02:00-04:00.</p><table><tr><th>Heure</th><th>Véhicule</th><th>Note</th></tr><tr><td>02:14</td><td>Fourgon noir</td><td>chargement</td></tr><tr><td>03:41</td><td>SUV gris</td><td class="flag">fuite</td></tr></table>`},
   surv2:{title:"Interceptions — Canal 7",cls:"CONFIDENTIEL",meta:["Source: SIGINT"],stamp:"",body:`<h4>Extraits</h4><p>"...livraison confirmée pour <span class="redacted">████</span>..."</p><p>"...éviter la patrouille de <span class="redacted">██████</span>..."</p>`},
+
+  /* ====== AGENTS INFILTRÉS ====== */
+  agents_index:{title:"Registre des agents infiltrés — État SA",cls:"TOP SECRET",meta:["Réf: INF-2026-01","Niveau: 5","Compartiment: BLACKVAULT"],stamp:"SECRET",body:`
+    <h4>Synthèse</h4>
+    <p>Liste des agents D.H.S. actuellement <b>sous couverture</b> dans les organisations criminelles de l'État de San Andreas. Chaque dossier détaillé est joint à part. Toute fuite de ce registre entraînera l'extraction immédiate des opérateurs concernés.</p>
+    <table>
+      <tr><th>Alias</th><th>Organisation cible</th><th>Zone</th><th>Statut</th></tr>
+      <tr><td>"CORBEAU"</td><td>Cartel Madrazo</td><td>Sandy Shores</td><td class="flag">ACTIF</td></tr>
+      <tr><td>"VEINE"</td><td>Lost MC</td><td>Blaine County</td><td class="flag">ACTIF</td></tr>
+      <tr><td>"ECHO-7"</td><td>Ballas Front Yard</td><td>Davis / South LS</td><td class="flag">EN SOMMEIL</td></tr>
+      <tr><td>"NÉON"</td><td>Vagos Locos</td><td>El Burro Heights</td><td class="flag">ACTIF</td></tr>
+      <tr><td>"OURS"</td><td>O'Neil Brothers</td><td>Grand Senora</td><td class="flag">COMPROMIS</td></tr>
+      <tr><td><span class="redacted">██████</span></td><td>Avon Hertz Corp.</td><td>Vinewood Hills</td><td class="flag">COUVERTURE PROFONDE</td></tr>
+    </table>
+    <div class="warn-note">⚠ Ce registre ne doit JAMAIS quitter le poste classé. Aucune copie autorisée vers la clé USB E:.</div>`},
+
+  agent_corbeau:{title:"Dossier — Agent CORBEAU",cls:"TOP SECRET",meta:["Alias: CORBEAU","Identité réelle: caviardée","Mission: 412 jours"],stamp:"SECRET",body:`
+    <h4>Profil</h4>
+    <p>Agent : <span class="redacted">████████</span> · Matricule : <span class="redacted">██████</span><br>
+    Cible : <b>Cartel Madrazo</b> — fait passer pour mécanicien à Sandy Shores depuis 14 mois.<br>
+    Contact : dépose morte au cimetière de Hill Valley, mardi 02h00.</p>
+    <h4>Renseignements remontés</h4>
+    <p>Trois cargaisons d'armes interceptées grâce à ses signalements (Q1 2026). Identité de "Le Comptable" confirmée.</p>
+    <h4>Risques</h4>
+    <p class="flag">Madrazo soupçonne une taupe depuis avril. Tests de loyauté en cours. Extraction d'urgence préparée — RV Sandy Strip 03h00.</p>`},
+
+  agent_veine:{title:"Dossier — Agent VEINE",cls:"TOP SECRET",meta:["Alias: VEINE","Couverture: Prospect Lost MC"],stamp:"SECRET",body:`
+    <h4>Profil</h4>
+    <p>Couverture : prospect du chapitre Blaine County des <b>Lost MC</b>. Patché depuis 7 mois. Tatouages compatibles avec sa légende civile (ex-mécanicien Sandy Shores).</p>
+    <h4>Renseignements remontés</h4>
+    <p>Filière méthamphétamine entre Stab City et Paleto Bay. Plan d'embuscade des Vagos déjoué (mai 2026).</p>
+    <h4>Sécurité</h4>
+    <p>Aucune communication directe. Drop chiffré via radio CB canal 19, codeword "ranger broken".</p>`},
+
+  agent_echo7:{title:"Dossier — Agent ECHO-7",cls:"TOP SECRET",meta:["Alias: ECHO-7","Statut: EN SOMMEIL"],stamp:"SECRET",body:`
+    <h4>État</h4>
+    <p>Agent rappelé au siège suite à fuite suspectée (août 2025). Maintenu dans une couverture de remplacement à Davis. Réactivation conditionnée à l'identification de la source de la fuite.</p>
+    <h4>Hypothèse en cours</h4>
+    <p>Recoupements internes pointent un agent de liaison D.H.S. — probable connivence avec le réseau <b>OMEGA</b>. Voir <i>note_taupes.txt</i>.</p>`},
+
+  agent_neon:{title:"Dossier — Agent NÉON",cls:"TOP SECRET",meta:["Alias: NÉON","Couverture: barman La Mesa"],stamp:"SECRET",body:`
+    <h4>Profil</h4>
+    <p>Sous couverture barman au <i>El Rancho Pequeño</i>, point de chute connu des <b>Vagos Locos</b>. Position idéale d'écoute mais haute exposition.</p>
+    <h4>Renseignements remontés</h4>
+    <p>Plans d'attaque de convoi armurerie LSPD (juin 2026) interceptés grâce à conversations captées au bar. Convoi sécurisé.</p>
+    <h4>Risques</h4>
+    <p class="flag">Membre Vagos l'a interrogé sur ses absences nocturnes. Surveillance renforcée 72h.</p>`},
+
+  agent_ours:{title:"Dossier — Agent OURS",cls:"TOP SECRET",meta:["Alias: OURS","Statut: COMPROMIS"],stamp:"SECRET",body:`
+    <h4>Alerte</h4>
+    <p class="flag">Couverture grillée le <span class="redacted">██/██/2026</span>. Agent extrait sous escorte tactique. Hospitalisé à <span class="redacted">████████</span> sous fausse identité.</p>
+    <h4>Cause de la compromission</h4>
+    <p>Photographie de l'agent publiée sur un forum criminel local. Source de la fuite non identifiée. Enquête interne ouverte (réf. IA-2026-018).</p>
+    <h4>Décision</h4>
+    <p>Identité civile à brûler. Nouvelle légende préparée pour réaffectation sous l'alias "<b>HÊTRE</b>".</p>`},
+
+  agent_redacted:{title:"Dossier — Agent ██████ (couverture profonde)",cls:"TOP SECRET / COMPARTIMENTÉ",meta:["Niveau requis: 5","Compartiment: BLACKVAULT"],stamp:"SECRET",body:`
+    <h4>Restriction</h4>
+    <p>Dossier compartimenté — accessible uniquement aux porteurs du clearance <b>BLACKVAULT</b>. Toute consultation est journalisée et notifiée à la cellule de contre-ingérence.</p>
+    <h4>Extraits autorisés</h4>
+    <p>Cible : <b>Avon Hertz Corp.</b> · Couverture : <span class="redacted">████████ ████████</span><br>
+    Durée actuelle : <span class="redacted">██ mois</span><br>
+    Dernier contact : <span class="redacted">██/██/2026</span></p>
+    <p>Mission : <span class="redacted">████████████████████████████████████</span></p>
+    <div class="warn-note">⚠ Toute exfiltration de ce dossier vers un support amovible déclenchera une alerte rouge automatique.</div>`},
+
+  note_taupes:{title:"note_taupes.txt",cls:"USAGE INTERNE — CONTRE-INGÉRENCE",meta:["Auteur: L. LAZARO","Modifié: récemment"],stamp:"",body:`
+    <p>Récap perso pour le brief de jeudi :</p>
+    <p>3 fuites confirmées en 18 mois (CORBEAU surveillé, ECHO-7 grillé, OURS extrait). Schéma commun : info qui ne sort pas du serveur S: → toujours dans la <b>même fenêtre de 72h</b> avant compromission.</p>
+    <ol>
+      <li>Liste réduite des accès S: niveau 5 (12 agents).</li>
+      <li>Recouper avec les <i>badge_logs</i> de la salle classée — qui consulte les dossiers INF avant chaque fuite ?</li>
+      <li>Le badge <span class="redacted">DHS-████-SA</span> est apparu 3x sur 3 incidents. À creuser.</li>
+    </ol>
+    <div class="warn-note">⚠ Ne PAS aborder en réunion ouverte. Garder pour brief restreint avec le directeur de division.</div>`},
+
+  protocole_extraction:{title:"Protocole d'extraction d'urgence — INF-04",cls:"CONFIDENTIEL",meta:["Réf: PROT-INF-04","Validité: 12 mois"],stamp:"",body:`
+    <h4>Déclencheurs</h4>
+    <p>L'extraction d'un agent infiltré est déclenchée si <b>au moins l'un</b> de ces signaux est observé :</p>
+    <ol>
+      <li>Codeword de détresse émis (audio ou silencieux).</li>
+      <li>Absence de check-in chiffré pendant <b>72h</b>.</li>
+      <li>Apparition d'éléments d'identité réelle sur supports criminels.</li>
+      <li>Signal "TANGO BURN" sur radio courte.</li>
+    </ol>
+    <h4>Procédure</h4>
+    <div class="cmd-block">
+      <span class="step">PHASE 1</span> — Brouillage des comms locales + dépêche équipe tactique (10 min).<br>
+      <span class="step">PHASE 2</span> — Récupération sur point d'extraction primaire ou secondaire.<br>
+      <span class="step">PHASE 3</span> — Transfert vers <i>safe house</i> hors district. Décontamination identité (badges, comptes, véhicules).<br>
+      <span class="step">PHASE 4</span> — Réaffectation ou retraite anticipée selon le degré de compromission.
+    </div>`},
+
+  liaison_handlers:{title:"liste_officiers_traitants.txt",cls:"CONFIDENTIEL",meta:["MAJ: hebdomadaire"],stamp:"",body:`
+    <h4>Officiers traitants (handlers) actifs</h4>
+    <table>
+      <tr><th>Handler</th><th>Agent suivi</th><th>RV régulier</th></tr>
+      <tr><td>L. LAZARO</td><td>CORBEAU</td><td>Cimetière Hill Valley — mardi 02h00</td></tr>
+      <tr><td>K. MORALES</td><td>VEINE</td><td>CB canal 19 — codeword "ranger broken"</td></tr>
+      <tr><td><span class="redacted">██████</span></td><td>NÉON</td><td>Drop boîte morte — Vinewood Plaza</td></tr>
+      <tr><td><span class="redacted">██████</span></td><td>ECHO-7</td><td>EN SOMMEIL — pas de contact</td></tr>
+    </table>`},
 };
 function openDoc(id){const d=DOCS[id];if(!d)return;document.getElementById("docWinTitle").textContent=d.title;const stamp=d.stamp?`<div class="doc-stamp">${d.stamp}</div>`:"";document.getElementById("docContent").innerHTML=`<div class="doc-head"><div class="doc-cls">// ${d.cls} //</div><div class="doc-title">${d.title}</div><div class="doc-meta">${d.meta.map(m=>`<span>${m}</span>`).join("")}</div></div>${stamp}<div class="doc-body">${d.body}</div>`;openWin("doc");renderTaskbar();}
 
@@ -549,17 +703,42 @@ function galleryHTML(){const ph=[["CAM-04 · Docks LS","#1a2230"],["CAM-09 · Sa
 function renderDatabase(){const inner=document.getElementById("dbInner");if(!inner)return;if(!S.dbUnlocked){inner.innerHTML=`<div class="db-lock"><svg class="lockic" viewBox="0 0 24 24" fill="none" stroke="#d23f33" stroke-width="1.3"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/><circle cx="12" cy="15.5" r="1.3"/></svg><div class="lt">BASE CENTRALE VERROUILLÉE</div><div class="ls">Entrez le code d'accès à 4 chiffres</div><div class="lstatus" id="dbStatus"></div><div class="db-code-box" id="dbCodeBox"><div class="db-cell"></div><div class="db-cell"></div><div class="db-cell"></div><div class="db-cell"></div></div><div class="db-keypad" id="dbKeypad"><div class="db-key" data-k="1">1</div><div class="db-key" data-k="2">2</div><div class="db-key" data-k="3">3</div><div class="db-key" data-k="4">4</div><div class="db-key" data-k="5">5</div><div class="db-key" data-k="6">6</div><div class="db-key" data-k="7">7</div><div class="db-key" data-k="8">8</div><div class="db-key" data-k="9">9</div><div class="db-key" data-k="clear">←</div><div class="db-key" data-k="0">0</div><div class="db-key" data-k="ok">▶</div></div><div class="db-hint">Le code se déchiffre via le Terminal (commande <b style="color:#e0a93a">decrypt</b>) après exécution de deploy.exe.</div></div>`;S.dbEntry="";document.getElementById("dbKeypad").addEventListener("click",dbKey);}else renderDbUnlocked();}
 function dbKey(e){const k=e.target.closest(".db-key");if(!k)return;const v=k.dataset.k;if(v==="clear")S.dbEntry=S.dbEntry.slice(0,-1);else if(v==="ok"){checkDb();return;}else if(S.dbEntry.length<4)S.dbEntry+=v;paintDb();if(S.dbEntry.length===4)setTimeout(checkDb,160);}
 function paintDb(){document.querySelectorAll("#dbCodeBox .db-cell").forEach((c,i)=>{c.classList.remove("err");c.classList.toggle("filled",i<S.dbEntry.length);c.textContent=i<S.dbEntry.length?S.dbEntry[i]:"";});}
-function checkDb(){if(S.dbEntry===DB_CODE){S.dbUnlocked=true;persist();toast("Base Centrale déverrouillée","green");renderDbUnlocked();}else{const st=document.getElementById("dbStatus");if(st)st.textContent="CODE REFUSÉ — accès journalisé";document.querySelectorAll("#dbCodeBox .db-cell").forEach(c=>c.classList.add("err"));S.dbEntry="";setTimeout(paintDb,400);}}
+function checkDb(){if(S.dbEntry===DB_CODE){S.dbUnlocked=true;persist();toast("Base Centrale déverrouillée","green");discordNotify("🔓 BASE CENTRALE DÉVERROUILLÉE","Code à 4 chiffres validé. Accès aux dossiers TOP SECRET débloqué.","alert");renderDbUnlocked();}else{const st=document.getElementById("dbStatus");if(st)st.textContent="CODE REFUSÉ — accès journalisé";document.querySelectorAll("#dbCodeBox .db-cell").forEach(c=>c.classList.add("err"));discordNotify("⚠ Tentative refusée","Code incorrect saisi sur la Base Centrale (accès journalisé).","warn");S.dbEntry="";setTimeout(paintDb,400);}}
 function renderDbUnlocked(){const inner=document.getElementById("dbInner");inner.innerHTML=`<div class="db-main"><div class="db-toolbar"><span class="dbt-title">BASE CENTRALE</span><span class="dbt-sub">CONNECTÉ — niveau 5</span></div><div class="db-content"><div class="db-section-title">Données confidentielles disponibles</div><div class="db-records">${dbRec("Registre national des cibles","48 240 entrées · chiffré","1.8 Go","TOP SECRET")}${dbRec("Archives SIGINT — interceptions","12 ans · audio + transcripts","940 Mo","TOP SECRET")}${dbRec("Réseau d'informateurs","identités protégées","210 Mo","NIVEAU 5")}${dbRec("Dossiers OMEGA (complet)","opérations actives","620 Mo","TOP SECRET")}</div><div class="copy-panel"><div class="copy-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg><span class="ch-title">Exfiltration des données</span></div><div class="copy-target">→ destination : E:\\BLACKVAULT\\dump.enc  ·  3.6 Go</div><div class="copy-btn-row"><button class="btn primary" id="copyBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg><span id="copyBtnTxt">COPIER LES DONNÉES</span></button></div><div class="dl-zone" id="dlZone"><div class="dl-status-row"><span class="dl-status" id="dlStatus">Transfert en cours…</span><span class="dl-pct" id="dlPct">0%</span></div><div class="dl-track"><div class="dl-fill" id="dlFill"></div></div><div class="dl-meta"><span>Débit : <b id="dlRate">2.1 Mo/s</b></span><span>Temps restant : <b id="dlEta">02:00:00</b></span></div><div class="dl-controls" id="dlControls"></div></div></div></div></div>`;const cb=document.getElementById("copyBtn");if(cb)cb.onclick=startDownload;if(S.dl.active||S.dl.accumulated>0||S.dl.completed||S.needUsbRemoval)refreshDlView();}
 function dbRec(n,m,s,c){return `<div class="db-rec"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M6 2h9l5 5v15H6V2z"/><path d="M15 2v5h5"/></svg><div class="rinfo"><div class="rname">${n}</div><div class="rmeta">${m}</div></div><div class="rsize">${s}</div><div class="rcls">${c}</div></div>`;}
 
 /* ====== DOWNLOAD (timestamp model, synchronisé) ====== */
 let dlInterval=null;
 function dlElapsed(){if(S.dl.completed)return DL_TOTAL;if(!S.dl.active)return S.dl.accumulated;return Math.min(S.dl.accumulated+(Date.now()-S.dl.startedAt)/1000*S.dl.rate,DL_TOTAL);}
-function startDownload(){if(!S.usbInserted){toast("Aucune clé USB — destination indisponible","red");return;}if(S.dl.completed){toast("Copie déjà terminée — retirez la clé USB","green");return;}if(S.dl.active)return;S.dl.active=true;S.dl.startedAt=Date.now();S.needUsbRemoval=false;persist();runDlTick();toast(S.dl.accumulated>0?"Transfert relancé":"Transfert démarré — ~2h","amber");}
+function startDownload(){
+  if(!S.usbInserted){toast("Aucune clé USB — destination indisponible","red");return;}
+  if(S.dl.completed){toast("Copie déjà terminée — retirez la clé USB","green");return;}
+  if(S.dl.active)return;
+  const resumed = S.dl.accumulated>0;
+  S.dl.active=true;S.dl.startedAt=Date.now();S.needUsbRemoval=false;
+  persist();runDlTick();
+  toast(resumed?"Transfert relancé":"Transfert démarré — ~2h","amber");
+  discordNotify(resumed?"▶ Transfert REPRIS":"▶ Transfert DÉMARRÉ",
+    resumed?"Reprise de l'exfiltration vers `E:\\BLACKVAULT\\dump.enc`.":"Exfiltration des données vers `E:\\BLACKVAULT\\dump.enc` — durée estimée ~2h.","info");
+}
 function runDlTick(){if(dlInterval)clearInterval(dlInterval);dlInterval=setInterval(()=>{refreshDlView();if(dlElapsed()>=DL_TOTAL&&S.dl.active){S.dl.active=false;S.dl.completed=true;S.dl.accumulated=DL_TOTAL;S.needUsbRemoval=true;clearInterval(dlInterval);dlInterval=null;persist();finishDownload();}},1000);}
-function pauseDownload(msg,requireRemoval){if(!S.dl.active&&!requireRemoval)return;if(S.dl.active){S.dl.accumulated=dlElapsed();S.dl.active=false;}if(dlInterval){clearInterval(dlInterval);dlInterval=null;}if(requireRemoval)S.needUsbRemoval=true;persist();refreshDlView();toast(msg||"Transfert suspendu","red");}
-function finishDownload(){refreshDlView();toast("COPIE TERMINÉE — retirez la clé USB","green");threat("CRITIQUE","bad");syncUI();}
+function pauseDownload(msg,requireRemoval){
+  if(!S.dl.active&&!requireRemoval)return;
+  if(S.dl.active){S.dl.accumulated=dlElapsed();S.dl.active=false;}
+  if(dlInterval){clearInterval(dlInterval);dlInterval=null;}
+  if(requireRemoval)S.needUsbRemoval=true;
+  persist();refreshDlView();
+  toast(msg||"Transfert suspendu","red");
+  discordNotify(requireRemoval?"⛔ Transfert ANNULÉ":"⏸ Transfert MIS EN PAUSE",
+    (msg||"Transfert suspendu")+(requireRemoval?" — clé USB à retirer.":""),"warn");
+}
+function finishDownload(){
+  refreshDlView();
+  toast("COPIE TERMINÉE — retirez la clé USB","green");
+  threat("CRITIQUE","bad");
+  syncUI();
+  discordNotify("✅ EXFILTRATION RÉUSSIE","Dump complet copié sur `E:\\BLACKVAULT\\dump.enc` (3.6 Go). Retrait de la clé USB requis pour clôturer.","ok");
+}
 function fmtTime(s){const p=n=>String(n).padStart(2,"0");return p(Math.floor(s/3600))+":"+p(Math.floor((s%3600)/60))+":"+p(Math.floor(s%60));}
 function refreshDlView(){const z=document.getElementById("dlZone");if(!z)return;if(S.dl.active||S.dl.accumulated>0||S.dl.completed||S.needUsbRemoval)z.classList.add("show");const el=dlElapsed(),pct=Math.floor(el/DL_TOTAL*100),rem=DL_TOTAL-el;const fill=document.getElementById("dlFill"),pe=document.getElementById("dlPct"),eta=document.getElementById("dlEta"),rate=document.getElementById("dlRate"),st=document.getElementById("dlStatus");if(fill)fill.style.width=pct+"%";if(pe)pe.textContent=pct+"%";if(eta)eta.textContent=fmtTime(rem);
   if(S.dl.completed){if(st){st.textContent="COPIE TERMINÉE ✓"+(S.dl.rate>1?" (accéléré)":"");st.className="dl-status done";}if(eta)eta.textContent="00:00:00";if(rate)rate.textContent="—";}
@@ -574,29 +753,79 @@ function renderDlControls(){const c=document.getElementById("dlControls");if(!c)
 
 /* ====== USB TRAY ====== */
 const usbTray=document.getElementById("usbTray");usbTray.onclick=toggleUsb;
-function toggleUsb(){if(S.usbInserted){S.usbInserted=false;if(S.dl.active){pauseDownload("Clé USB retirée — transfert suspendu");}if(S.needUsbRemoval){S.needUsbRemoval=false;toast("Clé USB retirée en sécurité — opération clôturée","green");}else if(!S.dl.active){toast("Clé USB retirée","red");}persist();usbTray.classList.add("gone");usbTray.classList.remove("pulse");document.getElementById("usbTrayTxt").textContent="USB retirée";renderFiles();refreshDlView();}else{S.usbInserted=true;persist();usbTray.classList.remove("gone");document.getElementById("usbTrayTxt").textContent="USB";toast("Clé USB reconnectée","green");renderFiles();refreshDlView();}}
+usbTray.addEventListener("contextmenu",e=>{e.preventDefault();showUsbMenu(e.clientX,e.clientY);});
+
+function showUsbMenu(x,y){
+  closeUsbMenu();
+  const m=document.createElement("div");
+  m.id="usbCtxMenu";
+  m.style.cssText="position:fixed;z-index:9999;background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:6px;min-width:210px;box-shadow:0 18px 42px rgba(0,0,0,.6);font-family:var(--mono);font-size:12px;";
+  const items = S.usbInserted
+    ? [{lbl:"🔌  Retirer la clé USB",act:toggleUsb,danger:true},
+       {lbl:"♻  Réinitialiser l'état",act:doReset,danger:true}]
+    : [{lbl:"🔌  Connecter la clé USB",act:toggleUsb},
+       {lbl:"♻  Réinitialiser l'état",act:doReset,danger:true}];
+  items.forEach(it=>{
+    const b=document.createElement("div");
+    b.textContent=it.lbl;
+    b.style.cssText="padding:9px 12px;border-radius:6px;cursor:pointer;color:"+(it.danger?"var(--red)":"var(--txt)")+";transition:.1s";
+    b.onmouseenter=()=>b.style.background="var(--panel3)";
+    b.onmouseleave=()=>b.style.background="transparent";
+    b.onclick=()=>{closeUsbMenu();it.act();};
+    m.appendChild(b);
+  });
+  document.body.appendChild(m);
+  // place to fit
+  const w=m.offsetWidth, h=m.offsetHeight;
+  m.style.left=(Math.min(x, window.innerWidth-w-8))+"px";
+  m.style.top =(Math.max(8, y - h - 6))+"px";
+}
+function closeUsbMenu(){const m=document.getElementById("usbCtxMenu");if(m)m.remove();}
+document.addEventListener("click",e=>{ if(!e.target.closest("#usbCtxMenu") && !e.target.closest("#usbTray")) closeUsbMenu(); });
+window.addEventListener("blur",closeUsbMenu);
+function toggleUsb(){
+  if(S.usbInserted){
+    S.usbInserted=false;
+    if(S.dl.active){pauseDownload("Clé USB retirée — transfert suspendu");}
+    if(S.needUsbRemoval){
+      S.needUsbRemoval=false;
+      toast("Clé USB retirée en sécurité — opération clôturée","green");
+      discordNotify("🔌 Clé USB retirée (fin d'opération)","Opération clôturée proprement après transfert.","ok");
+    } else if(!S.dl.active){
+      toast("Clé USB retirée","red");
+      discordNotify("🔌 Clé USB déconnectée","Le périphérique externe a été retiré du poste.","alert");
+    }
+    persist();
+    usbTray.classList.add("gone");usbTray.classList.remove("pulse");
+    document.getElementById("usbTrayTxt").textContent="USB retirée";
+    renderFiles();refreshDlView();
+  } else {
+    S.usbInserted=true;
+    persist();
+    usbTray.classList.remove("gone");
+    document.getElementById("usbTrayTxt").textContent="USB";
+    toast("Clé USB reconnectée","green");
+    discordNotify("🔌 Clé USB connectée","Périphérique externe rebranché sur le poste.","ok");
+    renderFiles();refreshDlView();
+  }
+}
 
 /* ====== RESET ====== */
-function doReset(){if(dlInterval){clearInterval(dlInterval);dlInterval=null;}S=freshState();curThreat={lvl:"FAIBLE",cls:""};try{localStorage.removeItem(SYNC_KEY);}catch(e){}lastRev=Date.now();usbTray.classList.remove("gone","pulse");document.getElementById("usbTrayTxt").textContent="USB";document.getElementById("hack").classList.remove("show");if(matrixIv)clearInterval(matrixIv);virusRunning=false;persist();threatRender();renderFiles();renderDatabase();refreshDlView();toast("État réinitialisé (toutes sessions)","green");}
+function doReset(){if(dlInterval){clearInterval(dlInterval);dlInterval=null;}S=freshState();curThreat={lvl:"FAIBLE",cls:""};try{localStorage.removeItem(SYNC_KEY);}catch(e){}lastRev=Date.now();usbTray.classList.remove("gone","pulse");document.getElementById("usbTrayTxt").textContent="USB";document.getElementById("hack").classList.remove("show");if(matrixIv)clearInterval(matrixIv);virusRunning=false;persist();threatRender();renderFiles();renderDatabase();refreshDlView();toast("État réinitialisé (toutes sessions)","green");discordNotify("♻ ÉTAT RÉINITIALISÉ","La partie a été remise à zéro pour toutes les sessions connectées.","info");}
+window.dhsReset = doReset; // fallback console : tape "dhsReset()" si Ctrl+F9 ne passe pas
 
 /* ====== TURBO (touche secrète F9) ====== */
 document.addEventListener("keydown",e=>{
-  /* Ctrl+F9 : reset complet de l'état partagé (tous les navigateurs) */
-  if(e.key==="F9" && e.ctrlKey){
-    e.preventDefault();
-    if(dlInterval){clearInterval(dlInterval);dlInterval=null;}
-    S = freshState();
-    curThreat = {lvl:"FAIBLE",cls:""};
-    lastRev = 0;
-    try{ localStorage.removeItem(SYNC_KEY); }catch(_){}
-    syncUI();
-    persist();
-    toast("État réinitialisé — partie remise à zéro","amber");
+  /* Ctrl+F9 : reset complet de l'état partagé (tous les navigateurs).
+     Fallback si la touche est interceptée : taper dhsReset() dans la console. */
+  if(e.key==="F9" && (e.ctrlKey||e.metaKey)){
+    e.preventDefault(); e.stopPropagation();
+    doReset();
     return;
   }
   /* F9 seul : turbo download */
-  if(e.key===TURBO_KEY && !e.ctrlKey){e.preventDefault();if(S.dl.active){S.dl.accumulated=dlElapsed();S.dl.startedAt=Date.now();}S.dl.rate=S.dl.rate===1?TURBO_MULT:1;persist();refreshDlView();toast("Mode accéléré : "+(S.dl.rate>1?"ACTIVÉ":"désactivé")+" (x"+TURBO_MULT+")",S.dl.rate>1?"amber":"green");}
-});
+  if(e.key===TURBO_KEY && !e.ctrlKey && !e.metaKey){e.preventDefault();if(S.dl.active){S.dl.accumulated=dlElapsed();S.dl.startedAt=Date.now();}S.dl.rate=S.dl.rate===1?TURBO_MULT:1;persist();refreshDlView();toast("Mode accéléré : "+(S.dl.rate>1?"ACTIVÉ":"désactivé")+" (x"+TURBO_MULT+")",S.dl.rate>1?"amber":"green");}
+}, true); // capture phase = ne se fait pas voler la touche par d'autres listeners
 
 /* ====== TOAST ====== */
 function toast(msg,type){const t=document.createElement("div");t.className="toast"+(type==="red"?" red":type==="green"?" green":"");t.textContent=msg;document.getElementById("toast-wrap").appendChild(t);setTimeout(()=>{t.style.transition="opacity .3s,transform .3s";t.style.opacity="0";t.style.transform="translateX(30px)";setTimeout(()=>t.remove(),300);},3000);}
