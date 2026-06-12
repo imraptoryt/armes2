@@ -580,7 +580,23 @@ function toggleUsb(){if(S.usbInserted){S.usbInserted=false;if(S.dl.active){pause
 function doReset(){if(dlInterval){clearInterval(dlInterval);dlInterval=null;}S=freshState();curThreat={lvl:"FAIBLE",cls:""};try{localStorage.removeItem(SYNC_KEY);}catch(e){}lastRev=Date.now();usbTray.classList.remove("gone","pulse");document.getElementById("usbTrayTxt").textContent="USB";document.getElementById("hack").classList.remove("show");if(matrixIv)clearInterval(matrixIv);virusRunning=false;persist();threatRender();renderFiles();renderDatabase();refreshDlView();toast("État réinitialisé (toutes sessions)","green");}
 
 /* ====== TURBO (touche secrète F9) ====== */
-document.addEventListener("keydown",e=>{if(e.key===TURBO_KEY){e.preventDefault();if(S.dl.active){S.dl.accumulated=dlElapsed();S.dl.startedAt=Date.now();}S.dl.rate=S.dl.rate===1?TURBO_MULT:1;persist();refreshDlView();toast("Mode accéléré : "+(S.dl.rate>1?"ACTIVÉ":"désactivé")+" (x"+TURBO_MULT+")",S.dl.rate>1?"amber":"green");}});
+document.addEventListener("keydown",e=>{
+  /* Ctrl+F9 : reset complet de l'état partagé (tous les navigateurs) */
+  if(e.key==="F9" && e.ctrlKey){
+    e.preventDefault();
+    if(dlInterval){clearInterval(dlInterval);dlInterval=null;}
+    S = freshState();
+    curThreat = {lvl:"FAIBLE",cls:""};
+    lastRev = 0;
+    try{ localStorage.removeItem(SYNC_KEY); }catch(_){}
+    syncUI();
+    persist();
+    toast("État réinitialisé — partie remise à zéro","amber");
+    return;
+  }
+  /* F9 seul : turbo download */
+  if(e.key===TURBO_KEY && !e.ctrlKey){e.preventDefault();if(S.dl.active){S.dl.accumulated=dlElapsed();S.dl.startedAt=Date.now();}S.dl.rate=S.dl.rate===1?TURBO_MULT:1;persist();refreshDlView();toast("Mode accéléré : "+(S.dl.rate>1?"ACTIVÉ":"désactivé")+" (x"+TURBO_MULT+")",S.dl.rate>1?"amber":"green");}
+});
 
 /* ====== TOAST ====== */
 function toast(msg,type){const t=document.createElement("div");t.className="toast"+(type==="red"?" red":type==="green"?" green":"");t.textContent=msg;document.getElementById("toast-wrap").appendChild(t);setTimeout(()=>{t.style.transition="opacity .3s,transform .3s";t.style.opacity="0";t.style.transform="translateX(30px)";setTimeout(()=>t.remove(),300);},3000);}
