@@ -81,10 +81,24 @@ Commandes utiles dans le channel :
 
 ## Format des logs automatiques
 
-`parseManual()` gère le format `+5 item stockage`. Pour les **logs automatiques**
-de ton script FiveM (souvent des embeds), `parseAutoLog()` est un squelette à
-adapter : envoie un screenshot d'un message de log réel et on cale le parseur
-sur le format exact (titre / description / champs de l'embed).
+Le bot lit **deux** formats :
+
+1. **Manuel** : `+5 ak-47 coffre1` / `-2 lockpick garage`
+2. **Auto (embed du script FiveM)** — calé sur ton format réel :
+
+   | Élément embed | Rôle |
+   |---|---|
+   | Titre (`Coffre`) | nom du **stockage** |
+   | champ `Item` | nom de l'objet (`repair_kit`) |
+   | champ `Amount` | quantité (`19`) |
+   | champ `Type` | `Deposit` → **+** · `Withdraw`/`Remove`/`Take` → **−** |
+   | champ `Initiator` | auteur du mouvement |
+
+   Tant que le bot voit le channel (intent **MESSAGE CONTENT** activé), il
+   capte ces embeds automatiquement — aucune saisie manuelle nécessaire.
+
+> Si un jour le format change (autres noms de champs), `parseAutoLog()` dans
+> `bot.js` accepte déjà des alias (`Items`, `Quantity`, `Storage`, etc.).
 
 ## Garder le bot en ligne 24/7
 

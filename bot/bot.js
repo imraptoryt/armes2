@@ -70,26 +70,35 @@ function parseManual(content) {
   return [{ storage: norm(m[4]), item: norm(m[3]), delta }];
 }
 
+/* Format auto réel (embed du script FiveM) :
+     Titre  = nom du stockage          ex: "Coffre"
+     Champs : Initiator | ID | Item | Amount | Type
+     Type   = "Deposit" (+) ou "Withdraw"/"Remove"/"Take" (-)            */
+function fieldVal(fields, ...names) {
+  if (!fields) return null;
+  const f = fields.find((fl) => names.some((n) => fl.name?.trim().toLowerCase() === n.toLowerCase()));
+  return f ? f.value?.trim() : null;
+}
 function parseAutoLog(message) {
-  /* ---- À ADAPTER AVEC LE SCREEN DES LOGS AUTO ----
-     Les logs automatiques arrivent souvent sous forme d'embed.
-     Inspecte message.embeds[0] : .title / .description / .fields
-     Exemple de squelette générique (description du style
-     "Joueur X a déposé 5x AK-47 dans coffre_bv") : */
   const e = message.embeds?.[0];
-  const text = [e?.title, e?.description, ...(e?.fields?.map((f) => f.name + " " + f.value) || []), message.content]
-    .filter(Boolean).join("\n");
-  if (!text) return null;
+  if (!e || !e.fields?.length) return null;
 
-  const moves = [];
-  // "a déposé 5x AK-47 dans coffre" / "a retiré 2x lockpick de garage"
-  const rx = /a\s+(déposé|ajouté|retiré|pris)\s+(\d+)\s*x?\s+(.+?)\s+(?:dans|de|du)\s+([\w-]+)/gi;
-  let m;
-  while ((m = rx.exec(text)) !== null) {
-    const sign = /retiré|pris/i.test(m[1]) ? -1 : 1;
-    moves.push({ storage: norm(m[4]), item: norm(m[3]), delta: sign * parseInt(m[2], 10) });
-  }
-  return moves.length ? moves : null;
+  const item = fieldVal(e.fields, "Item", "Items", "Objet");
+  const amountRaw = fieldVal(e.fields, "Amount", "Quantity", "Quantité", "Qty");
+  const type = (fieldVal(e.fields, "Type", "Action") || "").toLowerCase();
+  // le stockage est le titre de l'embed ; sinon un champ Storage/Stash/Coffre
+  const storage = e.title?.trim() || fieldVal(e.fields, "Storage", "Stash", "Coffre", "Inventory");
+  if (!item || !amountRaw || !storage) return null;
+
+  const amount = parseInt(String(amountRaw).replace(/[^\d]/g, ""), 10);
+  if (!Number.isFinite(amount) || amount === 0) return null;
+
+  // retrait = négatif
+  const isWithdraw = /(withdraw|remove|take|retrait|sortie|out|prendre)/.test(type);
+  const sign = isWithdraw ? -1 : 1; // par défaut (Deposit / Add / etc.) = positif
+
+  const author = fieldVal(e.fields, "Initiator", "Player", "Joueur", "Auteur") || "auto";
+  return [{ storage: norm(storage), item: norm(item), delta: sign * amount, author }];
 }
 
 /* ====== ÉCRITURE EN BASE ====== */
@@ -230,11 +239,14 @@ client.on("messageCreate", async (message) => {
     if (message.content.trim().toLowerCase() === "!stock") return cmdStock(message);
     if (message.content.trim().toLowerCase() === "!rapport") return postDailySummary(parisDay());
 
-    // mouvements de stock : manuel d'abord, sinon logs auto
+    // mouvements de stock : manuel d'abord, sinon logs auto (embed)
     const moves = parseManual(message.content) || parseAutoLog(message);
     if (!moves) return;
 
-    for (const mv of moves) await applyMove(mv, message.author?.username ?? "auto", message.content || "[embed]");
+    for (const mv of moves) {
+      const author = mv.author || message.author?.username || "auto";
+      await applyMove(mv, author, message.content || JSON.stringify(message.embeds?.[0]?.fields || ""));
+    }
     if (!message.author.bot) await message.react("✅").catch(() => {});
     console.log(`[stock] ${moves.map((m) => `${m.delta > 0 ? "+" : ""}${m.delta} ${m.item} (${m.storage})`).join(", ")}`);
   } catch (e) {
